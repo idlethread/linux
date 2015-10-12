@@ -93,6 +93,7 @@ config SND_SOC_IMX_PCM_DMA
 
 config SND_SOC_IMX_AUDMUX
 	tristate "Digital Audio Mux module support"
+	depends on ARCH_MXC || COMPILE_TEST
 	help
 	  Say Y if you want to add Digital Audio Mux (AUDMUX) support
 	  for the ARM i.MX CPUs.
