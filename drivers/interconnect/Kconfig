@@ -11,6 +11,13 @@ menuconfig INTERCONNECT
 
 if INTERCONNECT
 
+menuconfig INTERCONNECT_TEST
+	tristate "Debugfs test"
+	help
+	  Expose the interconnect API to userspace for testing purposes
+
+	  If unsure, say no.
+
 source "drivers/interconnect/qcom/Kconfig"
 
 endif
