@@ -46,6 +46,7 @@ static atomic_t in_suspend;
 static bool power_off_triggered;
 
 static struct thermal_governor *def_governor;
+static struct workqueue_struct *thermal_passive_wq;
 
 /*
  * Governor section: set of functions to handle thermal governors
@@ -281,7 +282,6 @@ static int __init thermal_register_governors(void)
 
 /*
  * Zone update section: main control loop applied to each zone while monitoring
- *
  * in polling mode. The monitoring is done using a workqueue.
  * Same update may be done on a zone by calling thermal_zone_device_update().
  *
@@ -290,19 +290,18 @@ static int __init thermal_register_governors(void)
  * - Hot trips will produce a notification to userspace;
  * - Critical trip point will cause a system shutdown.
  */
-static void thermal_zone_device_set_polling(struct thermal_zone_device *tz,
+
+static void thermal_zone_device_set_polling(struct workqueue_struct *queue,
+					    struct thermal_zone_device *tz,
 					    int delay)
 {
-	if (delay > 1000)
-		mod_delayed_work(system_freezable_power_efficient_wq,
-				 &tz->poll_queue,
-				 round_jiffies(msecs_to_jiffies(delay)));
-	else if (delay)
-		mod_delayed_work(system_freezable_power_efficient_wq,
-				 &tz->poll_queue,
-				 msecs_to_jiffies(delay));
-	else
+	if (delay) {
+		d = (delay > 1000) ? round_jiffies(msecs_to_jiffies(delay)) :
+			msecs_to_jiffies(delay);
+		mod_delayed_work(queue, &tz->poll_queue, d);
+	} else {
 		cancel_delayed_work(&tz->poll_queue);
+	}
 }
 
 static void monitor_thermal_zone(struct thermal_zone_device *tz)
@@ -310,11 +309,14 @@ static void monitor_thermal_zone(struct thermal_zone_device *tz)
 	mutex_lock(&tz->lock);
 
 	if (tz->passive)
-		thermal_zone_device_set_polling(tz, tz->passive_delay);
+		thermal_zone_device_set_polling(thermal_passive_wq,
+						tz, tz->passive_delay);
 	else if (tz->polling_delay)
-		thermal_zone_device_set_polling(tz, tz->polling_delay);
+		thermal_zone_device_set_polling
+			(system_freezable_power_efficient_wq,
+			tz, tz->polling_delay);
 	else
-		thermal_zone_device_set_polling(tz, 0);
+		thermal_zone_device_set_polling(NULL, tz, 0);
 
 	mutex_unlock(&tz->lock);
 }
@@ -1412,7 +1414,7 @@ void thermal_zone_device_unregister(struct thermal_zone_device *tz)
 
 	mutex_unlock(&thermal_list_lock);
 
-	cancel_delayed_work_sync(&tz->poll_queue);
+	thermal_zone_device_set_polling(NULL, tz, 0);
 
 	thermal_set_governor(tz, NULL);
 
@@ -1505,10 +1507,19 @@ static int __init thermal_init(void)
 {
 	int result;
 
+	thermal_passive_wq = alloc_workqueue("thermal_passive_wq",
+					     WQ_HIGHPRI |
+					     WQ_POWER_EFFICIENT |
+					     WQ_FREEZABLE,
+					     0);
+	if (!thermal_passive_wq) {
+		result = -ENOMEM;
+		goto error;
+	}
 	mutex_init(&poweroff_lock);
 	result = thermal_register_governors();
 	if (result)
-		goto error;
+		goto destroy_wq;
 
 	result = class_register(&thermal_class);
 	if (result)
@@ -1529,6 +1540,8 @@ unregister_class:
 	class_unregister(&thermal_class);
 unregister_governors:
 	thermal_unregister_governors();
+destroy_wq:
+	destroy_workqueue(thermal_passive_wq);
 error:
 	ida_destroy(&thermal_tz_ida);
 	ida_destroy(&thermal_cdev_ida);
