@@ -19,6 +19,11 @@
 
 struct cpufreq_policy;
 
+typedef int (*plat_mitig_t)(int cpu, u32 clip_freq);
+struct cpu_cooling_ops {
+	plat_mitig_t ceil_limit, floor_limit;
+};
+
 #ifdef CONFIG_CPU_THERMAL
 /**
  * cpufreq_cooling_register - function to create cpufreq cooling device.
@@ -48,6 +53,11 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
 #endif	/* CONFIG_CPU_THERMAL */
 
 #if defined(CONFIG_THERMAL_OF) && defined(CONFIG_CPU_THERMAL)
+
+struct thermal_cooling_device *
+cpufreq_platform_cooling_register(struct cpufreq_policy *policy,
+				  struct cpu_cooling_ops *ops);
+
 /**
  * of_cpufreq_cooling_register - create cpufreq cooling device based on DT.
  * @policy: cpufreq policy.
@@ -55,6 +65,13 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
 struct thermal_cooling_device *
 of_cpufreq_cooling_register(struct cpufreq_policy *policy);
 #else
+
+static inline struct thermal_cooling_device *
+cpufreq_platform_cooling_register(const struct cpumask *clip_cpus,
+				  struct cpu_cooling_ops *ops)
+{
+	return NULL;
+}
 static inline struct thermal_cooling_device *
 of_cpufreq_cooling_register(struct cpufreq_policy *policy)
 {
