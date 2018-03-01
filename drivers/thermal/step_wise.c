@@ -113,7 +113,7 @@ static void update_passive_instance(struct thermal_zone_device *tz,
 		tz->passive += value;
 }
 
-static void thermal_zone_trip_update(struct thermal_zone_device *tz, int trip)
+static void step_wise_tz_trip_update(struct thermal_zone_device *tz, int trip)
 {
 	int trip_temp;
 	enum thermal_trip_type trip_type;
@@ -187,10 +187,10 @@ static int step_wise_throttle(struct thermal_zone_device *tz, int trip)
 {
 	struct thermal_instance *instance;
 
-	thermal_zone_trip_update(tz, trip);
+	step_wise_tz_trip_update(tz, trip);
 
 	if (tz->forced_passive)
-		thermal_zone_trip_update(tz, THERMAL_TRIPS_NONE);
+		step_wise_tz_trip_update(tz, THERMAL_TRIPS_NONE);
 
 	mutex_lock(&tz->lock);
 
