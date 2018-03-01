@@ -13,7 +13,7 @@
 
 #include "thermal_core.h"
 
-static void thermal_zone_trip_update(struct thermal_zone_device *tz, int trip)
+static void bang_bang_tz_trip_update(struct thermal_zone_device *tz, int trip)
 {
 	int trip_temp, trip_hyst;
 	struct thermal_instance *instance;
@@ -100,7 +100,7 @@ static int bang_bang_control(struct thermal_zone_device *tz, int trip)
 {
 	struct thermal_instance *instance;
 
-	thermal_zone_trip_update(tz, trip);
+	bang_bang_tz_trip_update(tz, trip);
 
 	mutex_lock(&tz->lock);
 
