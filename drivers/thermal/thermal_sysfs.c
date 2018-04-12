@@ -716,6 +716,12 @@ cur_state_store(struct device *dev, struct device_attribute *attr,
 	if (result)
 		return result;
 	thermal_cooling_device_stats_update(cdev, state);
+	cdev->sysfs_req = state;
+	mutex_lock(&cdev->lock);
+	cdev->updated = false;
+	mutex_unlock(&cdev->lock);
+	thermal_cdev_update(cdev);
+
 	return count;
 }
 

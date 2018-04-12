@@ -173,7 +173,7 @@ EXPORT_SYMBOL_GPL(thermal_zone_set_trips);
 void thermal_cdev_update(struct thermal_cooling_device *cdev)
 {
 	struct thermal_instance *instance;
-	unsigned long target = 0;
+	unsigned long target = cdev->sysfs_req;
 
 	mutex_lock(&cdev->lock);
 	/* cooling device is updated*/
