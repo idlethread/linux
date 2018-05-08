@@ -96,16 +96,42 @@ static int of_thermal_get_temp(struct thermal_zone_device *tz,
 	return sensor->ops->get_temp(sensor->sensor_data, temp);
 }
 
+static void __of_thermal_agg_trip(struct thermal_sensor *sensor,
+				 int *floor, int *ceil)
+{
+	int low, high;
+	int max_lo = INT_MIN;
+	int min_hi = INT_MAX;
+	struct thermal_zone_device *tz;
+
+	list_for_each_entry(tz, &sensor->tz_list, sensor_tzd) {
+		thermal_zone_get_trip(tz, &low, &high);
+		if (low > max_lo)
+			max_lo = low;
+		if (high < min_hi)
+			min_hi = high;
+	}
+
+	*floor = max_lo;
+	*ceil = min_hi;
+}
+
 static int of_thermal_set_trips(struct thermal_zone_device *tz,
 				int low, int high)
 {
 	struct __thermal_zone *data = tz->devdata;
 	struct thermal_sensor *sensor = data->sensor;
+	int ret;
 
 	if (!sensor || !sensor->ops->set_trips)
 		return -EINVAL;
 
-	return sensor->ops->set_trips(sensor->sensor_data, low, high);
+	mutex_lock(&sensor->lock);
+	__of_thermal_agg_trip(sensor, &low, &high);
+	ret = sensor->ops->set_trips(sensor->sensor_data, low, high);
+	mutex_unlock(&sensor->lock);
+
+	return ret;
 }
 
 /**

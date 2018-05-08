@@ -113,32 +113,39 @@ exit:
 }
 EXPORT_SYMBOL_GPL(thermal_zone_get_temp);
 
+
+void thermal_zone_get_trip(struct thermal_zone_device *tz, int *low, int *high)
+{
+	int i, trip_low, trip_temp, hysteresis;
+
+	*low = -INT_MAX;
+	*high = INT_MAX;
+
+	for (i = 0; i < tz->trips; i++) {
+		tz->ops->get_trip_temp(tz, i, &trip_temp);
+		tz->ops->get_trip_hyst(tz, i, &hysteresis);
+
+		trip_low = trip_temp - hysteresis;
+
+		if (trip_low < tz->temperature && trip_low > *low)
+			*low = trip_low;
+
+		if (trip_temp > tz->temperature && trip_temp < *high)
+			*high = trip_temp;
+	}
+}
+
 void thermal_zone_set_trips(struct thermal_zone_device *tz)
 {
-	int low = -INT_MAX;
-	int high = INT_MAX;
-	int trip_temp, hysteresis;
-	int i, ret;
+	int low, high;
+	int ret;
 
 	mutex_lock(&tz->lock);
 
 	if (!tz->ops->set_trips || !tz->ops->get_trip_hyst)
 		goto exit;
 
-	for (i = 0; i < tz->trips; i++) {
-		int trip_low;
-
-		tz->ops->get_trip_temp(tz, i, &trip_temp);
-		tz->ops->get_trip_hyst(tz, i, &hysteresis);
-
-		trip_low = trip_temp - hysteresis;
-
-		if (trip_low < tz->temperature && trip_low > low)
-			low = trip_low;
-
-		if (trip_temp > tz->temperature && trip_temp < high)
-			high = trip_temp;
-	}
+	thermal_zone_get_trip(tz, &low, &high);
 
 	/* No need to change trip points */
 	if (tz->prev_low_trip == low && tz->prev_high_trip == high)
