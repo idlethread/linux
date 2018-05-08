@@ -39,10 +39,14 @@ struct __thermal_bind_params {
  * struct thermal_sensor - Holds individual sensor data
  * @sensor_data: sensor driver private data passed as input argument
  * @ops: sensor driver ops
+ * @tz_list: list of thermal zones for this sensor
+ * @lock: lock sensor during operations
  */
 struct thermal_sensor {
 	void *sensor_data;
 	const struct thermal_zone_of_device_ops *ops;
+	struct list_head tz_list;
+	struct mutex lock;
 };
 
 /**
@@ -433,9 +437,22 @@ thermal_zone_of_add_sensor(struct device_node *zone,
 	if (sensor->ops->set_emul_temp)
 		tzd->ops->set_emul_temp = of_thermal_set_emul_temp;
 
+	mutex_lock(&sensor->lock);
+	list_add_tail(&tzd->sensor_tzd, &sensor->tz_list);
+	mutex_unlock(&sensor->lock);
 	mutex_unlock(&tzd->lock);
 
 	return tzd;
+}
+
+static struct thermal_zone_device *
+thermal_zone_of_get_sensor_tzd(struct thermal_sensor *sensor)
+{
+	if (list_empty(&sensor->tz_list))
+		return ERR_PTR(-ENODEV);
+
+	return list_first_entry(&sensor->tz_list, struct thermal_zone_device,
+				sensor_tzd);
 }
 
 /**
@@ -463,12 +480,11 @@ thermal_zone_of_add_sensor(struct device_node *zone,
  * 01 - This function must enqueue the new sensor instead of using
  * it as the only source of temperature values.
  *
- * 02 - There must be a way to match the sensor with all thermal zones
- * that refer to it.
- *
  * Return: On success returns a valid struct thermal_zone_device,
  * otherwise, it returns a corresponding ERR_PTR(). Caller must
  * check the return value with help of IS_ERR() helper.
+ * The returned thermal_zone_device is one of the thermal zones that is
+ * using this sensor as the temeprature source.
  */
 struct thermal_zone_device *
 thermal_zone_of_sensor_register(struct device *dev, int sensor_id, void *data,
@@ -492,6 +508,8 @@ thermal_zone_of_sensor_register(struct device *dev, int sensor_id, void *data,
 		of_node_put(np);
 		return ERR_PTR(-ENOMEM);
 	}
+	INIT_LIST_HEAD(&sensor->tz_list);
+	mutex_init(&sensor->lock);
 	sensor->sensor_data = data;
 	sensor->ops = ops;
 	sensor_np = of_node_get(dev->of_node);
@@ -524,14 +542,14 @@ thermal_zone_of_sensor_register(struct device *dev, int sensor_id, void *data,
 
 			of_node_put(sensor_specs.np);
 			of_node_put(child);
-			goto exit;
 		}
 		of_node_put(sensor_specs.np);
 	}
-exit:
+
 	of_node_put(sensor_np);
 	of_node_put(np);
 
+	tzd = thermal_zone_of_get_sensor_tzd(sensor);
 	if (tzd == ERR_PTR(-ENODEV))
 		kfree(sensor);
 	return tzd;
@@ -572,7 +590,9 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
 	tzd->ops->get_trend = NULL;
 	tzd->ops->set_emul_temp = NULL;
 
-	kfree(tz->sensor);
+	list_del(&tzd->sensor_tzd);
+	if (list_empty(&tz->sensor->tz_list))
+		kfree(tz->sensor);
 	tz->sensor = NULL;
 	mutex_unlock(&tzd->lock);
 }
