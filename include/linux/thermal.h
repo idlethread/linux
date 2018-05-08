@@ -387,6 +387,7 @@ struct thermal_zone_device *devm_thermal_zone_of_sensor_register(
 		const struct thermal_zone_of_device_ops *ops);
 void devm_thermal_zone_of_sensor_unregister(struct device *dev,
 					    struct thermal_zone_device *tz);
+void thermal_zone_of_sensor_notify(struct thermal_zone_device *tzd);
 #else
 static inline struct thermal_zone_device *
 thermal_zone_of_sensor_register(struct device *dev, int id, void *data,
@@ -414,6 +415,9 @@ void devm_thermal_zone_of_sensor_unregister(struct device *dev,
 {
 }
 
+static inline
+void thermal_zone_of_sensor_notify(struct thermal_zone_device *tzd)
+{ }
 #endif
 
 #if IS_ENABLED(CONFIG_THERMAL)

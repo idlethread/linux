@@ -41,12 +41,18 @@ struct __thermal_bind_params {
  * @ops: sensor driver ops
  * @tz_list: list of thermal zones for this sensor
  * @lock: lock sensor during operations
+ * @low_trip: sensor's low trip temp
+ * @high_trip: sensor's high trip temp
+ * @low_tz: the thermal zone whose low trip is used as @low_trip
+ * @high_tz: the thermal zone whose high trip is used as @high_trip
  */
 struct thermal_sensor {
 	void *sensor_data;
 	const struct thermal_zone_of_device_ops *ops;
 	struct list_head tz_list;
 	struct mutex lock;
+	int low_trip, high_trip;
+	struct thermal_zone_device *low_tz, *high_tz;
 };
 
 /**
@@ -102,18 +108,26 @@ static void __of_thermal_agg_trip(struct thermal_sensor *sensor,
 	int low, high;
 	int max_lo = INT_MIN;
 	int min_hi = INT_MAX;
-	struct thermal_zone_device *tz;
+	struct thermal_zone_device *tz, *lo_tz = NULL, *hi_tz = NULL;
 
 	list_for_each_entry(tz, &sensor->tz_list, sensor_tzd) {
 		thermal_zone_get_trip(tz, &low, &high);
-		if (low > max_lo)
+		if (low > max_lo) {
 			max_lo = low;
-		if (high < min_hi)
+			lo_tz = tz;
+		}
+		if (high < min_hi) {
 			min_hi = high;
+			hi_tz = tz;
+		}
 	}
 
 	*floor = max_lo;
 	*ceil = min_hi;
+	sensor->low_trip = max_lo;
+	sensor->high_trip = min_hi;
+	sensor->low_tz = lo_tz;
+	sensor->high_tz = hi_tz;
 }
 
 static int of_thermal_set_trips(struct thermal_zone_device *tz,
@@ -429,6 +443,69 @@ static struct thermal_zone_device_ops of_thermal_ops = {
 };
 
 /***   sensor API   ***/
+
+static void thermal_zone_of_get_trip(struct thermal_zone_device *tz,
+				     int temp, int *low_trip, int *hi_trip)
+{
+	struct __thermal_zone *data = tz->devdata;
+	int low = INT_MIN;
+	int hi = INT_MAX;
+	int i;
+
+	for (i = 0; i < data->ntrips; i++) {
+		int trip_temp = data->trips[i].temperature;
+
+		if (trip_temp < temp && trip_temp > low)
+			*low_trip = i;
+		if (trip_temp > temp && trip_temp < hi)
+			*hi_trip = i;
+	}
+}
+
+/**
+ * thermal_zone_of_sensor_notify - notify framework of a trip
+ * @tzd: the thermal zone device
+ *
+ * Sensor drivers may use this API to notify the thermal framework that the
+ * temperature has crossed the trip threshold. This function is akin to
+ * thermal_notify_framework() call, but is expected to be called by a sensor
+ * that registered itself with the framework using the
+ * thermal_zone_of_add_sensor() function.
+ */
+void thermal_zone_of_sensor_notify(struct thermal_zone_device *tzd)
+{
+	struct __thermal_zone *tz = tzd->devdata;
+	struct thermal_sensor *sensor = tz->sensor;
+	int temp, low_trip, hi_trip, *trip;
+	struct thermal_zone_device *trip_tz = NULL;
+
+	if (!tz->sensor)
+		return;
+
+	if (of_thermal_get_temp(tzd, &temp))
+		return;
+
+	mutex_lock(&sensor->lock);
+	if (tzd->temperature < sensor->low_trip && sensor->low_tz) {
+		trip_tz = sensor->low_tz;
+		trip = &low_trip;
+	}
+	if (tzd->temperature > sensor->high_trip && sensor->high_tz) {
+		trip_tz = sensor->high_tz;
+		trip = &hi_trip;
+	}
+
+	if (trip_tz)
+		thermal_zone_of_get_trip(trip_tz, temp, &low_trip, &hi_trip);
+
+	mutex_unlock(&sensor->lock);
+
+	if (!trip_tz)
+		return;
+
+	thermal_notify_framework(trip_tz, *trip);
+}
+EXPORT_SYMBOL(thermal_zone_of_sensor_notify);
 
 static struct thermal_zone_device *
 thermal_zone_of_add_sensor(struct device_node *zone,
