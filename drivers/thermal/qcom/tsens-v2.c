@@ -8,6 +8,9 @@
 #include <linux/bitops.h>
 #include "tsens.h"
 
+#define TRDY_OFFSET		0xe4
+#define TRDY_READY_BIT		BIT(0)
+
 #define STATUS_OFFSET		0xa0
 #define LAST_TEMP_MASK		0xfff
 #define STATUS_VALID_BIT	BIT(21)
@@ -17,8 +20,16 @@ static int get_temp_tsens_v2(struct tsens_device *tmdev, int id, int *temp)
 	struct tsens_sensor *s = &tmdev->sensor[id];
 	u32 code;
 	unsigned int status_reg;
+	unsigned int trdy_reg;
 	u32 last_temp = 0, last_temp2 = 0, last_temp3 = 0;
 	int ret;
+
+	trdy_reg = tmdev->tm_offset + TRDY_OFFSET + s->hw_id * 4;
+	ret = regmap_read(tmdev->tm_map, trdy_reg, &code);
+	if (ret)
+		return ret;
+	if (!(code & TRDY_READY_BIT))
+		return -EAGAIN;
 
 	status_reg = tmdev->tm_offset + STATUS_OFFSET + s->hw_id * 4;
 	ret = regmap_read(tmdev->map, status_reg, &code);
