@@ -302,6 +302,13 @@
 					type = "critical";
 				};
 			};
+
+			cooling-maps {
+				map0 {
+					trip = <&gpu_alert>;
+					cooling-device = <&gpu THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+				};
+			};
 		};
 
 		camera-thermal {
@@ -932,7 +939,7 @@
 			};
 		};
 
-		gpu@1c00000 {
+		gpu: gpu@1c00000 {
 			compatible = "qcom,adreno-306.0", "qcom,adreno";
 			reg = <0x01c00000 0x20000>;
 			reg-names = "kgsl_3d0_reg_memory";
@@ -954,6 +961,7 @@
 			    <&gcc GFX3D_CLK_SRC>;
 			power-domains = <&gcc OXILI_GDSC>;
 			operating-points-v2 = <&gpu_opp_table>;
+			#cooling-cells = <2>;
 			iommus = <&gpu_iommu 1>, <&gpu_iommu 2>;
 		};
 
