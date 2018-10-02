@@ -468,6 +468,11 @@
 	vdd-3.3-ch0-supply = <&vreg_l25a_3p3>;
 };
 
+&lmh1 {
+	isens_vref-supply = <&vreg_l1a_0p875>;
+	isens-vref-settings = <880000 880000 36000>;
+};
+
 /* PINCTRL - additions to nodes defined in sdm845.dtsi */
 
 &qup_i2c10_default {

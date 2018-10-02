@@ -193,6 +193,7 @@
 			capacity-dmips-mhz = <607>;
 			qcom,freq-domain = <&cpufreq_hw 0>;
 			#cooling-cells = <2>;
+			qcom,lmh-thermal = <&lmh0>;
 			next-level-cache = <&L2_0>;
 			L2_0: l2-cache {
 				compatible = "cache";
@@ -211,6 +212,7 @@
 			capacity-dmips-mhz = <607>;
 			qcom,freq-domain = <&cpufreq_hw 0>;
 			#cooling-cells = <2>;
+			qcom,lmh-thermal = <&lmh0>;
 			next-level-cache = <&L2_100>;
 			L2_100: l2-cache {
 				compatible = "cache";
@@ -226,6 +228,7 @@
 			capacity-dmips-mhz = <607>;
 			qcom,freq-domain = <&cpufreq_hw 0>;
 			#cooling-cells = <2>;
+			qcom,lmh-thermal = <&lmh0>;
 			next-level-cache = <&L2_200>;
 			L2_200: l2-cache {
 				compatible = "cache";
@@ -241,6 +244,7 @@
 			capacity-dmips-mhz = <607>;
 			qcom,freq-domain = <&cpufreq_hw 0>;
 			#cooling-cells = <2>;
+			qcom,lmh-thermal = <&lmh0>;
 			next-level-cache = <&L2_300>;
 			L2_300: l2-cache {
 				compatible = "cache";
@@ -256,6 +260,7 @@
 			capacity-dmips-mhz = <1024>;
 			qcom,freq-domain = <&cpufreq_hw 1>;
 			#cooling-cells = <2>;
+			qcom,lmh-thermal = <&lmh0>;
 			next-level-cache = <&L2_400>;
 			L2_400: l2-cache {
 				compatible = "cache";
@@ -271,6 +276,7 @@
 			capacity-dmips-mhz = <1024>;
 			qcom,freq-domain = <&cpufreq_hw 1>;
 			#cooling-cells = <2>;
+			qcom,lmh-thermal = <&lmh0>;
 			next-level-cache = <&L2_500>;
 			L2_500: l2-cache {
 				compatible = "cache";
@@ -286,6 +292,7 @@
 			capacity-dmips-mhz = <1024>;
 			qcom,freq-domain = <&cpufreq_hw 1>;
 			#cooling-cells = <2>;
+			qcom,lmh-thermal = <&lmh0>;
 			next-level-cache = <&L2_600>;
 			L2_600: l2-cache {
 				compatible = "cache";
@@ -301,6 +308,7 @@
 			capacity-dmips-mhz = <1024>;
 			qcom,freq-domain = <&cpufreq_hw 1>;
 			#cooling-cells = <2>;
+			qcom,lmh-thermal = <&lmh0>;
 			next-level-cache = <&L2_700>;
 			L2_700: l2-cache {
 				compatible = "cache";
@@ -2120,6 +2128,22 @@
 			#reset-cells = <1>;
 		};
 
+		lmh0: limits-hw-thermal@0 {
+			compatible = "qcom,lmh";
+			reg = <0x17D70800 0x400>;
+			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+			qcom,affinity = <0>;
+			#thermal-sensor-cells = <0>;
+		};
+
+		lmh1: limits-hw-thermal@1 {
+			compatible = "qcom,lmh";
+			reg = <0x17D78800 0x400>;
+			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+			qcom,affinity = <1>;
+			#thermal-sensor-cells = <0>;
+		};
+
 		tsens0: thermal-sensor@c263000 {
 			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
 			reg = <0 0x0c263000 0 0x1ff>, /* TM */
@@ -2993,6 +3017,31 @@
 					temperature = <90000>;
 					hysteresis = <2000>;
 					type = "hot";
+				};
+			};
+		};
+
+		lmh-thermal-00 {
+			polling-delay-passive = <250>;
+			polling-delay = <1000>;
+			thermal-sensors = <&lmh0>;
+			trips {
+				active-config {
+					temperature = <95000>;
+					hysteresis = <30000>;
+					type = "passive";
+				};
+			};
+		};
+		lmh-thermal-01 {
+			polling-delay-passive = <0>;
+			polling-delay = <0>;
+			thermal-sensors = <&lmh1>;
+			trips {
+				active-config {
+					temperature = <95000>;
+					hysteresis = <30000>;
+					type = "passive";
 				};
 			};
 		};
