@@ -753,7 +753,7 @@ cpufreq_platform_cooling_register(struct cpufreq_policy *policy,
 {
 	struct device_node *cpu_node;
 
-	cpu_node = of_cpu_device_node_get(cpumask_first(policy->cpus));
+	cpu_node = of_cpu_device_node_get(cpumask_first(policy->related_cpus));
 	return __cpufreq_cooling_register(cpu_node, policy, 0, plat_ops);
 }
 EXPORT_SYMBOL(cpufreq_platform_cooling_register);
