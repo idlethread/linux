@@ -171,6 +171,67 @@ int qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt, u32 *resp)
 EXPORT_SYMBOL(qcom_scm_hdcp_req);
 
 /**
+ * qcom_scm_lmh_enable() - Enable Limit Hardware
+ *
+ * Write LMH register(s) through SCM.
+ */
+int qcom_scm_lmh_enable(void)
+{
+	int ret = qcom_scm_clk_enable();
+
+	if (ret)
+		return ret;
+
+	ret = __qcom_scm_lmh_enable(__scm->dev);
+	qcom_scm_clk_disable();
+	return ret;
+}
+EXPORT_SYMBOL(qcom_scm_lmh_enable);
+
+/**
+ * qcom_scm_lmh_write() - Program the Limits Hardware
+ *
+ */
+int qcom_scm_lmh_write(uint32_t node_id, uint32_t fn,
+		       uint32_t setting, uint32_t val, uint32_t val1,
+		       bool enable_val1)
+{
+	int ret;
+	u32 *payload;
+	size_t payload_len;
+	dma_addr_t payload_phys;
+
+	payload_len = ((enable_val1) ? 6 : 5) * sizeof(uint32_t);
+	payload = dma_alloc_coherent(__scm->dev, payload_len, &payload_phys,
+				     GFP_KERNEL);
+	if (!payload) {
+		dev_err(__scm->dev, "Allocation of payload buffer failed.\n");
+		return -ENOMEM;
+	}
+
+	payload[0] = fn; /* algorithm */
+	payload[1] = 0; /* unused sub-algorithm */
+	payload[2] = setting;
+	payload[3] = enable_val1 ? 2 : 1; /* number of values */
+	payload[4] = val;
+	if (enable_val1)
+		payload[5] = val1;
+
+	ret = qcom_scm_clk_enable();
+	if (ret)
+		goto free_payload;
+
+	ret = __qcom_scm_lmh_write(__scm->dev, payload_phys,
+				   payload_len, node_id);
+	qcom_scm_clk_disable();
+
+free_payload:
+	dma_free_coherent(__scm->dev, payload_len, payload, payload_phys);
+	return ret;
+}
+EXPORT_SYMBOL(qcom_scm_lmh_write);
+
+/**
  * qcom_scm_pas_supported() - Check if the peripheral authentication service is
  *			      available for the given peripherial
  * @peripheral:	peripheral id

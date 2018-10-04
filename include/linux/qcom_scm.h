@@ -41,6 +41,9 @@ extern bool qcom_scm_is_available(void);
 extern bool qcom_scm_hdcp_available(void);
 extern int qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt,
 			     u32 *resp);
+extern int qcom_scm_lmh_enable(void);
+extern int qcom_scm_lmh_write(uint32_t node_id, uint32_t fn, uint32_t setting,
+			uint32_t val, uint32_t val1, bool enable_val1);
 extern bool qcom_scm_pas_supported(u32 peripheral);
 extern int qcom_scm_pas_init_image(u32 peripheral, const void *metadata,
 				   size_t size);

@@ -40,6 +40,13 @@ extern int __qcom_scm_is_call_available(struct device *dev, u32 svc_id,
 extern int __qcom_scm_hdcp_req(struct device *dev,
 		struct qcom_scm_hdcp_req *req, u32 req_cnt, u32 *resp);
 
+#define QCOM_SCM_SVC_LMH		0x13
+#define QCOM_SCM_LMH_PROFILE_CHANGE	0x1
+#define QCOM_SCM_LMH_DCVSH		0x10
+extern int __qcom_scm_lmh_enable(struct device *dev);
+extern int __qcom_scm_lmh_write(struct device *dev, phys_addr_t addr, size_t len,
+				uint32_t node_id);
+
 extern void __qcom_scm_init(void);
 
 #define QCOM_SCM_SVC_PIL		0x2

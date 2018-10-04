@@ -502,3 +502,34 @@ int __qcom_scm_io_writel(struct device *dev, phys_addr_t addr, unsigned int val)
 	return qcom_scm_call(dev, QCOM_SCM_SVC_IO, QCOM_SCM_IO_WRITE,
 			     &desc, &res);
 }
+
+int __qcom_scm_lmh_enable(struct device *dev)
+{
+	struct qcom_scm_desc desc = {0};
+	struct arm_smccc_res res;
+
+	desc.args[0] = 1;
+	desc.arginfo = QCOM_SCM_ARGS(1, QCOM_SCM_VAL);
+
+	return qcom_scm_call(dev, QCOM_SCM_SVC_LMH, QCOM_SCM_LMH_PROFILE_CHANGE,
+			     &desc, &res);
+}
+
+#define LIMITS_NODE_DCVS            0x44435653
+int __qcom_scm_lmh_write(struct device *dev, phys_addr_t mem_region,
+			 size_t len, uint32_t node_id)
+{
+	struct qcom_scm_desc desc = {0};
+	struct arm_smccc_res res;
+
+	desc.args[0] = mem_region;
+	desc.args[1] = len;
+	desc.args[2] = LIMITS_NODE_DCVS;
+	desc.args[3] = node_id;
+	desc.args[4] = 0; /* version */
+	desc.arginfo = QCOM_SCM_ARGS(5, QCOM_SCM_RO, QCOM_SCM_VAL, QCOM_SCM_VAL,
+				     QCOM_SCM_VAL, QCOM_SCM_VAL);
+
+	return qcom_scm_call(dev, QCOM_SCM_SVC_LMH, QCOM_SCM_LMH_DCVSH,
+			     &desc, &res);
+}
