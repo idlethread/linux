@@ -991,6 +991,94 @@ int qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt, u32 *resp)
 }
 EXPORT_SYMBOL(qcom_scm_hdcp_req);
 
+/**
+ * qcom_scm_lmh_enable() - Enable Limits Management Hardware
+ *
+ * Write LMH register(s) through SCM.
+ */
+int qcom_scm_lmh_enable(void)
+{
+	int ret;
+	struct qcom_scm_desc desc = {
+		.svc = QCOM_SCM_SVC_LMH,
+		.cmd = QCOM_SCM_LMH_PROFILE_CHANGE,
+		.arginfo = QCOM_SCM_ARGS(1, QCOM_SCM_VAL);
+		.args[0] = 1,
+		.owner = ARM_SMCCC_OWNER_SIP,
+	};
+	struct qcom_scm_res res;
+
+	ret = qcom_scm_clk_enable();
+	if (ret)
+		return ret;
+
+	ret = qcom_scm_call(__scm->dev, &desc, &res);
+
+	qcom_scm_clk_disable();
+
+	return ret;
+}
+EXPORT_SYMBOL(qcom_scm_lmh_enable);
+
+#define LIMITS_NODE_DCVS            0x44435653
+/**
+ * qcom_scm_lmh_write() - Program the Limits Hardware
+ *
+ */
+int qcom_scm_lmh_write(uint32_t node_id, uint32_t fn,
+		       uint32_t setting, uint32_t val, uint32_t val1,
+		       bool enable_val1)
+{
+	int ret;
+	u32 *payload;
+	size_t payload_len;
+	dma_addr_t payload_phys;
+	struct qcom_scm_desc desc = {
+		.svc = QCOM_SCM_SVC_LMH,
+		.cmd = QCOM_SCM_LMH_DCVSH,
+		.arginfo = QCOM_SCM_ARGS(5, QCOM_SCM_RO, QCOM_SCM_VAL,
+					 QCOM_SCM_VAL, QCOM_SCM_VAL,
+					 QCOM_SCM_VAL),
+		.owner = ARM_SMCCC_OWNER_SIP,
+	};
+	struct qcom_scm_res res;
+
+	payload_len = ((enable_val1) ? 6 : 5) * sizeof(uint32_t);
+	payload = dma_alloc_coherent(__scm->dev, payload_len, &payload_phys,
+				     GFP_KERNEL);
+	if (!payload) {
+		dev_err(__scm->dev, "Allocation of payload buffer failed.\n");
+		return -ENOMEM;
+	}
+
+	payload[0] = fn; /* algorithm */
+	payload[1] = 0; /* unused sub-algorithm */
+	payload[2] = setting;
+	payload[3] = enable_val1 ? 2 : 1; /* number of values */
+	payload[4] = val;
+	if (enable_val1)
+		payload[5] = val1;
+
+	desc.args[0] = payload_phys;
+	desc.args[1] = payload_len;
+	desc.args[2] = LIMITS_NODE_DCVS;
+	desc.args[3] = node_id;
+	desc.args[4] = 0; /* version */
+
+	ret = qcom_scm_clk_enable();
+	if (ret)
+		goto free_payload;
+
+	ret = qcom_scm_call(__scm->dev, &desc, &res);
+
+	qcom_scm_clk_disable();
+
+free_payload:
+	dma_free_coherent(__scm->dev, payload_len, payload, payload_phys);
+	return ret;
+}
+EXPORT_SYMBOL(qcom_scm_lmh_write);
+
 int qcom_scm_qsmmu500_wait_safe_toggle(bool en)
 {
 	struct qcom_scm_desc desc = {

@@ -91,6 +91,9 @@ extern int qcom_scm_ocmem_unlock(enum qcom_scm_ocmem_client id, u32 offset,
 extern bool qcom_scm_hdcp_available(void);
 extern int qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt,
 			     u32 *resp);
+extern int qcom_scm_lmh_enable(void);
+extern int qcom_scm_lmh_write(uint32_t node_id, uint32_t fn, uint32_t setting,
+			      uint32_t val, uint32_t val1, bool enable_val1);
 
 extern int qcom_scm_qsmmu500_wait_safe_toggle(bool en);
 #else
@@ -141,6 +144,10 @@ static inline int qcom_scm_ocmem_unlock(enum qcom_scm_ocmem_client id,
 static inline bool qcom_scm_hdcp_available(void) { return false; }
 static inline int qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt,
 		u32 *resp) { return -ENODEV; }
+extern int qcom_scm_lmh_enable(void) { return -ENODEV; }
+extern int qcom_scm_lmh_write(uint32_t node_id, uint32_t fn, uint32_t setting,
+			      uint32_t val, uint32_t val1,
+			      bool enable_val1) { return -ENODEV; }
 
 static inline int qcom_scm_qsmmu500_wait_safe_toggle(bool en)
 		{ return -ENODEV; }
