@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 obj-$(CONFIG_QCOM_TSENS)	+= qcom_tsens.o
-obj-$(CONFIG_QCOM_LMH) += lmh.o
+obj-$(CONFIG_QCOM_LMH) += lmh.o #lmh_dbg.o
 
 qcom_tsens-y			+= tsens.o tsens-common.o tsens-v0_1.o \
 				   tsens-8960.o tsens-v2.o tsens-v1.o
