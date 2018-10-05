@@ -20,3 +20,12 @@ config QCOM_SPMI_TEMP_ALARM
 	  trip points. The temperature reported by the thermal sensor reflects the
 	  real time die temperature if an ADC is present or an estimate of the
 	  temperature based upon the over temperature stage value.
+
+config QCOM_LMH
+	bool "Qualcomm LMH Thermal Driver"
+	depends on THERMAL_OF
+	help
+	  This enables the thermal driver for the Limits Management Hardware.
+	  The LMH block is available for each cluster and can be used to perform
+	  quick thermal mitigations by tracking temperatures of the CPUs and
+	  taking thermal action in the hardware without software intervention.
