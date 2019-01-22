@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
+#include <linux/interconnect.h>
 
 /* UART specific GENI registers */
 #define SE_UART_LOOPBACK_CFG		0x22c
@@ -1293,6 +1294,22 @@ static int qcom_geni_serial_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	/* Set the bus quota to a reasonable value */
+	port->se.avg_bw = console ? Bps_to_icc(1000) : Bps_to_icc(2500);
+	port->se.peak_bw = Bps_to_icc(76800000);
+	ret = geni_interconnect_init(&port->se);
+	if (ret) {
+		dev_err(&pdev->dev, "interconnect_init failed %d\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Vote for interconnect path early. This has to move as part of
+	 * Runtime PM APIs when implemented for better control betwen
+	 * console and non-console usecases
+	 */
+	geni_icc_update_bw(&port->se, true);
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res)
 		return -EINVAL;
@@ -1361,8 +1378,11 @@ static int __maybe_unused qcom_geni_serial_sys_suspend(struct device *dev)
 {
 	struct qcom_geni_serial_port *port = dev_get_drvdata(dev);
 	struct uart_port *uport = &port->uport;
+	int ret;
 
 	uart_suspend_port(uport->private_data, uport);
+
+	geni_icc_update_bw(&port->se, false);
 
 	if (port->wakeup_irq > 0)
 		enable_irq(port->wakeup_irq);
@@ -1377,6 +1397,8 @@ static int __maybe_unused qcom_geni_serial_sys_resume(struct device *dev)
 
 	if (port->wakeup_irq > 0)
 		disable_irq(port->wakeup_irq);
+
+	geni_icc_update_bw(&port->se, true);
 
 	return uart_resume_port(uport->private_data, uport);
 }
