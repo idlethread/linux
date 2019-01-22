@@ -12,6 +12,7 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/platform_device.h>
 #include <linux/qcom-geni-se.h>
+#include <linux/interconnect.h>
 
 /**
  * DOC: Overview
@@ -85,11 +86,21 @@
  * @dev:		Device pointer of the QUP wrapper core
  * @base:		Base address of this instance of QUP wrapper core
  * @ahb_clks:		Handle to the primary & secondary AHB clocks
+ * @icc_path:		Array of interconnect path handles
+ * @geni_wrapper_lock:	Lock to protect the bus bandwidth request
+ * @cur_avg_bw:		Current Bus Average BW request value from GENI QUP
+ * @cur_peak_bw:	Current Bus Peak BW request value from GENI QUP
+ * @peak_bw_list_head:	Sorted resource list based on peak bus BW
  */
 struct geni_wrapper {
 	struct device *dev;
 	void __iomem *base;
 	struct clk_bulk_data ahb_clks[NUM_AHB_CLKS];
+	struct icc_path *icc_path[2];
+	struct mutex geni_wrapper_lock;
+	u32 cur_avg_bw;
+	u32 cur_peak_bw;
+	struct list_head peak_bw_list_head;
 };
 
 #define QUP_HW_VER_REG			0x4
@@ -441,6 +452,71 @@ static void geni_se_clks_off(struct geni_se *se)
 }
 
 /**
+ * geni_icc_update_bw() - Request to update bw vote on an interconnect path
+ * @se:			Pointer to the concerned serial engine.
+ * @update:		Flag to update bw vote.
+ *
+ * This function is used to request set bw vote on interconnect path handle.
+ */
+void geni_icc_update_bw(struct geni_se *se, bool update)
+{
+	struct geni_se *temp = NULL;
+	struct list_head *ins_list_head;
+	struct geni_wrapper *wrapper;
+
+	mutex_lock(&se->wrapper->geni_wrapper_lock);
+
+	wrapper = se->wrapper;
+
+	if (update) {
+		wrapper->cur_avg_bw += se->avg_bw;
+		ins_list_head = &wrapper->peak_bw_list_head;
+		list_for_each_entry(temp, &wrapper->peak_bw_list_head,
+				peak_bw_list) {
+			if (temp->peak_bw < se->peak_bw)
+				break;
+			ins_list_head = &temp->peak_bw_list;
+		}
+
+		list_add(&se->peak_bw_list, ins_list_head);
+
+		if (ins_list_head == &wrapper->peak_bw_list_head)
+			wrapper->cur_peak_bw = se->peak_bw;
+	} else {
+		if (unlikely(list_empty(&se->peak_bw_list))) {
+			mutex_unlock(&wrapper->geni_wrapper_lock);
+			return;
+		}
+
+		wrapper->cur_avg_bw -= se->avg_bw;
+
+		list_del_init(&se->peak_bw_list);
+		temp = list_first_entry_or_null(&wrapper->peak_bw_list_head,
+					struct geni_se, peak_bw_list);
+		if (temp && temp->peak_bw != wrapper->cur_peak_bw)
+			wrapper->cur_peak_bw = temp->peak_bw;
+		else if (!temp && wrapper->cur_peak_bw)
+			wrapper->cur_peak_bw = 0;
+	}
+
+	/*
+	 * This bw vote is to enable internal QUP core clock as well as to
+	 * enable path towards memory.
+	 */
+	icc_set_bw(wrapper->icc_path[0], wrapper->cur_avg_bw,
+		wrapper->cur_peak_bw);
+
+	/*
+	 * This is just register configuration path so doesn't need avg bw.
+	 * Set only peak bw to enable this path.
+	 */
+	icc_set_bw(wrapper->icc_path[1], 0, wrapper->cur_peak_bw);
+
+	mutex_unlock(&wrapper->geni_wrapper_lock);
+}
+EXPORT_SYMBOL(geni_icc_update_bw);
+
+/**
  * geni_se_resources_off() - Turn off resources associated with the serial
  *                           engine
  * @se:	Pointer to the concerned serial engine.
@@ -720,6 +796,47 @@ void geni_se_rx_dma_unprep(struct geni_se *se, dma_addr_t iova, size_t len)
 }
 EXPORT_SYMBOL(geni_se_rx_dma_unprep);
 
+/**
+ * geni_interconnect_init() - Request to get interconnect path handle
+ * @se:			Pointer to the concerned serial engine.
+ *
+ * This function is used to get interconnect path handle.
+ */
+int geni_interconnect_init(struct geni_se *se)
+{
+	struct geni_wrapper *wrapper_rsc;
+
+	if (unlikely(!se || !se->wrapper))
+		return -EINVAL;
+
+	wrapper_rsc = se->wrapper;
+
+	if ((IS_ERR_OR_NULL(wrapper_rsc->icc_path[0]) ||
+		IS_ERR_OR_NULL(wrapper_rsc->icc_path[1]))) {
+
+		wrapper_rsc->icc_path[0] = of_icc_get(wrapper_rsc->dev,
+						"qup-memory");
+		if (IS_ERR(wrapper_rsc->icc_path[0]))
+			return PTR_ERR(wrapper_rsc->icc_path[0]);
+
+		wrapper_rsc->icc_path[1] = of_icc_get(wrapper_rsc->dev,
+						"qup-config");
+		if (IS_ERR(wrapper_rsc->icc_path[1])) {
+			icc_put(wrapper_rsc->icc_path[0]);
+			wrapper_rsc->icc_path[0] = NULL;
+			return PTR_ERR(wrapper_rsc->icc_path[1]);
+		}
+
+		INIT_LIST_HEAD(&wrapper_rsc->peak_bw_list_head);
+		mutex_init(&wrapper_rsc->geni_wrapper_lock);
+	}
+
+	INIT_LIST_HEAD(&se->peak_bw_list);
+
+	return 0;
+}
+EXPORT_SYMBOL(geni_interconnect_init);
+
 static int geni_se_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -752,6 +869,17 @@ static int geni_se_probe(struct platform_device *pdev)
 	return devm_of_platform_populate(dev);
 }
 
+static int geni_se_remove(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct geni_wrapper *wrapper = dev_get_drvdata(dev);
+
+	icc_put(wrapper->icc_path[0]);
+	icc_put(wrapper->icc_path[1]);
+
+	return 0;
+}
+
 static const struct of_device_id geni_se_dt_match[] = {
 	{ .compatible = "qcom,geni-se-qup", },
 	{}
@@ -764,6 +892,7 @@ static struct platform_driver geni_se_driver = {
 		.of_match_table = geni_se_dt_match,
 	},
 	.probe = geni_se_probe,
+	.remove = geni_se_remove,
 };
 module_platform_driver(geni_se_driver);
 

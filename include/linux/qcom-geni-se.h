@@ -33,6 +33,10 @@ struct clk;
  * @clk:		Handle to the core serial engine clock
  * @num_clk_levels:	Number of valid clock levels in clk_perf_tbl
  * @clk_perf_tbl:	Table of clock frequency input to serial engine clock
+ * @avg_bw:		Average bus bandwidth value for Serial Engine device
+ * @peak_bw:		Peak bus bandwidth value for Serial Engine device
+ * @peak_bw_list:	List Head of peak bus banwidth list for Serial Engine
+ *			device
  */
 struct geni_se {
 	void __iomem *base;
@@ -41,6 +45,9 @@ struct geni_se {
 	struct clk *clk;
 	unsigned int num_clk_levels;
 	unsigned long *clk_perf_tbl;
+	u32 avg_bw;
+	u32 peak_bw;
+	struct list_head peak_bw_list;
 };
 
 /* Common SE registers */
@@ -416,5 +423,9 @@ int geni_se_rx_dma_prep(struct geni_se *se, void *buf, size_t len,
 void geni_se_tx_dma_unprep(struct geni_se *se, dma_addr_t iova, size_t len);
 
 void geni_se_rx_dma_unprep(struct geni_se *se, dma_addr_t iova, size_t len);
+
+int geni_interconnect_init(struct geni_se *se);
+
+void geni_icc_update_bw(struct geni_se *se, bool update);
 #endif
 #endif
