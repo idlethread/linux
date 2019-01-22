@@ -17,6 +17,12 @@ Required properties if child node exists:
 - #address-cells: 	Must be <1> for Serial Engine Address
 - #size-cells: 		Must be <1> for Serial Engine Address Size
 - ranges: 		Must be present
+- interconnects:	phandle to a interconnect provider. Please refer
+			../interconnect/interconnect.txt for details.
+			Must be 2 paths corresponding to 2 AXI ports.
+- interconnect-names:	Port names to differentiate between the
+			2 interconnect paths defined with interconnect
+			specifier.
 
 Properties for children:
 
@@ -66,6 +72,10 @@ Example:
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges;
+
+		interconnects = <&qnoc 11 &qnoc 512>,
+				<&qnoc 0 &qnoc 543>;
+		interconnect-names = "qup-memory", "qup-config";
 
 		i2c0: i2c@a94000 {
 			compatible = "qcom,geni-i2c";
