@@ -15,6 +15,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/qcom-geni-se.h>
 #include <linux/spinlock.h>
+#include <linux/interconnect.h>
 
 #define SE_I2C_TX_TRANS_LEN		0x26c
 #define SE_I2C_RX_TRANS_LEN		0x270
@@ -521,6 +522,15 @@ static int geni_i2c_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	/* Set the bus quota to a reasonable value */
+	gi2c->se.avg_bw = Bps_to_icc(1000);
+	gi2c->se.peak_bw = Bps_to_icc(76800000);
+	ret = geni_interconnect_init(&gi2c->se);
+	if (ret) {
+		dev_err(&pdev->dev, "interconnect_init failed %d\n", ret);
+		return ret;
+	}
+
 	ret = device_property_read_u32(&pdev->dev, "clock-frequency",
 							&gi2c->clk_freq_out);
 	if (ret) {
@@ -629,6 +639,8 @@ static int __maybe_unused geni_i2c_runtime_suspend(struct device *dev)
 		gi2c->suspended = 1;
 	}
 
+	geni_icc_update_bw(&gi2c->se, false);
+
 	return 0;
 }
 
@@ -637,6 +649,7 @@ static int __maybe_unused geni_i2c_runtime_resume(struct device *dev)
 	int ret;
 	struct geni_i2c_dev *gi2c = dev_get_drvdata(dev);
 
+	geni_icc_update_bw(&gi2c->se, true);
 	ret = geni_se_resources_on(&gi2c->se);
 	if (ret)
 		return ret;
