@@ -750,6 +750,13 @@
 			#address-cells = <2>;
 			#size-cells = <2>;
 			ranges;
+
+			interconnects = <&rsc_hlos MASTER_BLSP_1
+					&rsc_hlos SLAVE_EBI1>,
+					<&rsc_hlos MASTER_APPSS_PROC
+					&rsc_hlos SLAVE_BLSP_1>;
+			interconnect-names = "qup-memory", "qup-config";
+
 			status = "disabled";
 
 			i2c0: i2c@880000 {
@@ -1058,6 +1065,13 @@
 			#address-cells = <2>;
 			#size-cells = <2>;
 			ranges;
+
+			interconnects = <&rsc_hlos MASTER_BLSP_2
+					&rsc_hlos SLAVE_EBI1>,
+					<&rsc_hlos MASTER_APPSS_PROC
+					&rsc_hlos SLAVE_BLSP_2>;
+			interconnect-names = "qup-memory", "qup-config";
+
 			status = "disabled";
 
 			i2c8: i2c@a80000 {
