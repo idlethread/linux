@@ -12,6 +12,7 @@
 #include <linux/qcom-geni-se.h>
 #include <linux/spi/spi.h>
 #include <linux/spinlock.h>
+#include <linux/interconnect.h>
 
 /* SPI SE specific registers and respective register fields */
 #define SE_SPI_CPHA		0x224
@@ -581,6 +582,15 @@ static int spi_geni_probe(struct platform_device *pdev)
 	spin_lock_init(&mas->lock);
 	pm_runtime_enable(&pdev->dev);
 
+	/* Set the bus quota to a reasonable value */
+	mas->se.avg_bw = Bps_to_icc(2500);
+	mas->se.peak_bw = Bps_to_icc(200000000);
+	ret = geni_interconnect_init(&mas->se);
+	if (ret) {
+		dev_err(&pdev->dev, "interconnect_init failed %d\n", ret);
+		return ret;
+	}
+
 	ret = spi_geni_init(mas);
 	if (ret)
 		goto spi_geni_probe_runtime_disable;
@@ -620,8 +630,15 @@ static int __maybe_unused spi_geni_runtime_suspend(struct device *dev)
 {
 	struct spi_master *spi = dev_get_drvdata(dev);
 	struct spi_geni_master *mas = spi_master_get_devdata(spi);
+	int ret;
 
-	return geni_se_resources_off(&mas->se);
+	ret = geni_se_resources_off(&mas->se);
+	if (ret)
+		return ret;
+
+	geni_icc_update_bw(&mas->se, false);
+
+	return 0;
 }
 
 static int __maybe_unused spi_geni_runtime_resume(struct device *dev)
@@ -629,6 +646,7 @@ static int __maybe_unused spi_geni_runtime_resume(struct device *dev)
 	struct spi_master *spi = dev_get_drvdata(dev);
 	struct spi_geni_master *mas = spi_master_get_devdata(spi);
 
+	geni_icc_update_bw(&mas->se, true);
 	return geni_se_resources_on(&mas->se);
 }
 
