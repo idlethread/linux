@@ -6,6 +6,7 @@
 #include <linux/err.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/pm.h>
 #include <linux/slab.h>
@@ -77,12 +78,15 @@ MODULE_DEVICE_TABLE(of, tsens_table);
 static const struct thermal_zone_of_device_ops tsens_of_ops = {
 	.get_temp = tsens_get_temp,
 	.get_trend = tsens_get_trend,
+	.set_trips = tsens_set_trips,
 };
 
 static int tsens_register(struct tsens_priv *priv)
 {
-	int i;
+	int i, ret, irq;
 	struct thermal_zone_device *tzd;
+	struct resource *res;
+	struct platform_device *op = of_find_device_by_node(priv->dev->of_node);
 
 	for (i = 0;  i < priv->num_sensors; i++) {
 		priv->sensor[i].priv = priv;
@@ -95,7 +99,28 @@ static int tsens_register(struct tsens_priv *priv)
 		if (priv->ops->enable)
 			priv->ops->enable(priv, i);
 	}
+
+	res = platform_get_resource(op, IORESOURCE_IRQ, 0);
+	if (unlikely(!res)) {
+		ret = -EINVAL;
+		goto err_put_device;
+	}
+	irq = res->start;
+	ret = devm_request_threaded_irq(&op->dev, irq,
+					NULL, tsens_irq_thread,
+					IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
+					res->name, priv);
+	if (ret) {
+		dev_err(&op->dev, "failed to get tsens irq\n");
+		goto err_put_device;
+	}
+	enable_irq_wake(irq);
+
 	return 0;
+
+err_put_device:
+	put_device(&op->dev);
+	return ret;
 }
 
 static int tsens_probe(struct platform_device *pdev)
@@ -176,6 +201,7 @@ static int tsens_remove(struct platform_device *pdev)
 {
 	struct tsens_priv *priv = platform_get_drvdata(pdev);
 
+	tsens_disable_irq(priv);
 	if (priv->ops->disable)
 		priv->ops->disable(priv);
 

@@ -13,6 +13,22 @@
 #include <linux/regmap.h>
 #include "tsens.h"
 
+/* IRQ state, mask and clear */
+struct tsens_irq_data {
+	u32 up_viol;
+	int up_thresh;
+	u32 up_irq_mask;
+	u32 up_irq_clear;
+	u32 low_viol;
+	int low_thresh;
+	u32 low_irq_mask;
+	u32 low_irq_clear;
+	u32 crit_viol;
+	u32 crit_thresh;
+	u32 crit_irq_mask;
+	u32 crit_irq_clear;
+};
+
 char *qfprom_read(struct device *dev, const char *cname)
 {
 	struct nvmem_cell *cell;
@@ -65,6 +81,18 @@ void compute_intercept_slope(struct tsens_priv *priv, u32 *p1,
 	}
 }
 
+static inline u32 degc_to_code(int degc, const struct tsens_sensor *sensor)
+{
+	u32 code = (degc * sensor->slope + sensor->offset) / SLOPE_FACTOR;
+
+	if (code > THRESHOLD_MAX_ADC_CODE)
+		code = THRESHOLD_MAX_ADC_CODE;
+	else if (code < THRESHOLD_MIN_ADC_CODE)
+		code = THRESHOLD_MIN_ADC_CODE;
+	pr_debug("raw_code: 0x%x, degc:%d\n", code, degc);
+	return code;
+}
+
 static inline int code_to_degc(u32 adc_code, const struct tsens_sensor *s)
 {
 	int degc, num, den;
@@ -82,6 +110,340 @@ static inline int code_to_degc(u32 adc_code, const struct tsens_sensor *s)
 	degc /= den;
 
 	return degc;
+}
+
+static inline unsigned int tsens_ver(struct tsens_priv *priv)
+{
+	return priv->feat->ver_major;
+}
+
+static inline u32 irq_mask(u32 hw_id)
+{
+	return 1 << hw_id;
+}
+
+/**
+ * tsens_set_interrupt_v1 - Disable an interrupt (enable = false)
+ *                          Re-enable an interrupt (enable = true)
+ */
+static void tsens_set_interrupt_v1(struct tsens_priv *priv, const struct tsens_irq_data d,
+				   u32 hw_id, enum tsens_irq_type irq_type, bool enable)
+{
+	if (enable) {
+		switch (irq_type) {
+		case UPPER:
+			regmap_field_write(priv->rf[UP_INT_CLEAR_0 + hw_id], 0);
+			break;
+		case LOWER:
+			regmap_field_write(priv->rf[LOW_INT_CLEAR_0 + hw_id], 0);
+			break;
+		default:
+			dev_err(priv->dev, "%s: Invalid irq_type\n", __func__);
+			break;
+		}
+	} else {
+		switch (irq_type) {
+		case UPPER:
+			regmap_field_write(priv->rf[UP_INT_CLEAR_0 + hw_id], 1);
+			break;
+		case LOWER:
+			regmap_field_write(priv->rf[LOW_INT_CLEAR_0 + hw_id], 1);
+			break;
+		default:
+			dev_err(priv->dev, "%s: Invalid irq_type\n", __func__);
+			break;
+		}
+	}
+}
+
+/**
+ * tsens_set_interrupt_v2 - Disable an interrupt (enable = false)
+ *                          Re-enable an interrupt (enable = true)
+ */
+static void tsens_set_interrupt_v2(struct tsens_priv *priv, const struct tsens_irq_data d,
+				   u32 hw_id, enum tsens_irq_type irq_type, bool enable)
+{
+	if (enable) {
+		switch (irq_type) {
+		case UPPER:
+			regmap_field_write(priv->rf[UP_INT_MASK_0 + hw_id], 0);
+			break;
+		case LOWER:
+			regmap_field_write(priv->rf[LOW_INT_MASK_0 + hw_id], 0);
+			break;
+		case CRITICAL:
+			regmap_field_write(priv->rf[CRIT_INT_MASK_0 + hw_id], 0);
+			break;
+		default:
+			dev_err(priv->dev, "%s: Invalid irq_type\n", __func__);
+			break;
+		}
+	} else {
+		/* To reset the interrupt flag for a sensor:
+		 *  1. Mask further interrupts for this sensor
+		 *  2. Write 1 followed by 0 to clear the interrupt
+		 */
+		switch (irq_type) {
+		case UPPER:
+			regmap_field_write(priv->rf[UP_INT_MASK_0 + hw_id], 1);
+			regmap_field_write(priv->rf[UP_INT_CLEAR_0 + hw_id], 1);
+			regmap_field_write(priv->rf[UP_INT_CLEAR_0 + hw_id], 0);
+			break;
+		case LOWER:
+			regmap_field_write(priv->rf[LOW_INT_MASK_0 + hw_id], 1);
+			regmap_field_write(priv->rf[LOW_INT_CLEAR_0 + hw_id], 1);
+			regmap_field_write(priv->rf[LOW_INT_CLEAR_0 + hw_id], 0);
+			break;
+		case CRITICAL:
+			regmap_field_write(priv->rf[CRIT_INT_MASK_0 + hw_id], 1);
+			regmap_field_write(priv->rf[CRIT_INT_CLEAR_0 + hw_id], 1);
+			regmap_field_write(priv->rf[CRIT_INT_CLEAR_0 + hw_id], 0);
+			break;
+		default:
+			dev_err(priv->dev, "%s: Invalid irq_type\n", __func__);
+			break;
+		}
+	}
+}
+
+/**
+ * tsens_set_interrupt - Disable an interrupt (enable = false)
+ *                       Re-enable an interrupt (enable = true)
+ */
+static void tsens_set_interrupt(struct tsens_priv *priv, const struct tsens_irq_data d,
+				u32 hw_id, enum tsens_irq_type irq_type, bool enable)
+{
+	/* FIXME: remove tsens_irq_data */
+	dev_err(priv->dev, "[%u] %s: %s -> %s\n", hw_id, __func__,
+		irq_type ? ((irq_type == 1) ? "UP" : "CRITICAL") : "LOW",
+		enable ? "en" : "dis");
+	if (tsens_ver(priv) > VER_1_X)
+		tsens_set_interrupt_v2(priv, d, hw_id, irq_type, enable);
+	else
+		tsens_set_interrupt_v1(priv, d, hw_id, irq_type, enable);
+}
+
+static int tsens_read_irq_state(struct tsens_priv *priv, u32 hw_id,
+				struct tsens_sensor *s, struct tsens_irq_data *d)
+{
+	int ret, up_temp, low_temp;
+
+	if (hw_id > priv->num_sensors) {
+		dev_err(priv->dev, "%s Invalid hw_id\n", __func__);
+		return -EINVAL;
+	}
+
+	ret = regmap_field_read(priv->rf[UPPER_STATUS_0 + hw_id], &d->up_viol);
+	if (ret)
+		return ret;
+	ret = regmap_field_read(priv->rf[UP_THRESH_0 + hw_id], &up_temp);
+	if (ret)
+		return ret;
+	ret = regmap_field_read(priv->rf[LOWER_STATUS_0 + hw_id], &d->low_viol);
+	if (ret)
+		return ret;
+	ret = regmap_field_read(priv->rf[LOW_THRESH_0 + hw_id], &low_temp);
+	if (ret)
+		return ret;
+	ret = regmap_field_read(priv->rf[UP_INT_CLEAR_0 + hw_id], &d->up_irq_clear);
+	if (ret)
+		return ret;
+	ret = regmap_field_read(priv->rf[LOW_INT_CLEAR_0 + hw_id], &d->low_irq_clear);
+	if (ret)
+		return ret;
+	if (tsens_ver(priv) > VER_1_X) {
+		ret = regmap_field_read(priv->rf[UP_INT_MASK_0 + hw_id], &d->up_irq_mask);
+		if (ret)
+			return ret;
+		ret = regmap_field_read(priv->rf[LOW_INT_MASK_0 + hw_id], &d->low_irq_mask);
+		if (ret)
+			return ret;
+	} else {
+		/* No mask register on older TSENS */
+		d->up_irq_mask = 0;
+		d->low_irq_mask = 0;
+	}
+
+	if (priv->feat->adc) {
+		d->up_thresh = code_to_degc(up_temp, s) * 1000;
+		d->low_thresh = code_to_degc(low_temp, s) * 1000;
+	} else {
+		d->up_thresh = up_temp * 100;
+		d->low_thresh = low_temp * 100;
+	}
+	if (d->up_viol || d->low_viol) {
+		dev_err(priv->dev, "[%u] %s (viol): status: low(%u), up(%u) "
+			"| clr: low(%u), up(%u) | thresh: (%d:%d) | mask: low(%u), up(%u)\n",
+			hw_id, __func__, d->low_viol, d->up_viol, d->low_irq_clear, d->up_irq_clear,
+			d->low_thresh, d->up_thresh, d->low_irq_mask, d->up_irq_mask);
+	}
+	return 0;
+}
+
+static inline u32 masked_irq(u32 hw_id, u32 mask, enum tsens_ver ver)
+{
+	if (ver > VER_1_X) {
+		return mask & (1 << hw_id);
+	} else {
+		/* v1, v0.1 don't have a irq mask register */
+		return 0;
+	}
+}
+
+irqreturn_t tsens_irq_thread(int irq, void *data)
+{
+	struct tsens_priv *priv = data;
+	int temp, ret, i;
+	unsigned long flags;
+	bool enable = true, disable = false;
+
+	/* Check if any sensor raised an IRQ - for each sensor
+	 * connected to the TSENS block
+	 */
+	for (i = 0; i < priv->num_sensors; i++) {
+		struct tsens_sensor *s = &priv->sensor[i];
+		struct tsens_irq_data d;
+		u32 hw_id = s->hw_id;
+		bool trigger = 0;
+
+		if (IS_ERR(priv->sensor[i].tzd))
+			continue;
+		ret = get_temp_tsens_valid(s, &temp);
+		if (ret) {
+			dev_err(priv->dev, "[%u] %s error reading sensor\n", hw_id, __func__);
+			continue;
+		}
+
+		dev_err(priv->dev, "[%u] %s: temp: %d\n", hw_id, __func__, temp);
+
+		spin_lock_irqsave(&priv->ul_lock, flags);
+
+		tsens_read_irq_state(priv, hw_id, s, &d);
+
+		dev_dbg(priv->dev, "[%u] irq_thread, temp: %d\n", hw_id, temp);
+
+		if (d.up_viol &&
+		    !masked_irq(hw_id, d.up_irq_mask, tsens_ver(priv))) {
+			tsens_set_interrupt(priv, d, hw_id, UPPER, disable);
+			if (d.up_thresh > temp) {
+				dev_err(priv->dev, "[%u] %s re-arm upper\n",
+					priv->sensor[i].hw_id, __func__);
+				/* unmask the interrupt for this sensor */
+				tsens_set_interrupt(priv, d, hw_id, UPPER, enable);
+			} else {
+				trigger = 1;
+				/* Keep irq masked */
+			}
+		} else if (d.low_viol &&
+			   !masked_irq(hw_id, d.low_irq_mask, tsens_ver(priv))) {
+			tsens_set_interrupt(priv, d, hw_id, LOWER, disable);
+			if (d.low_thresh < temp) {
+				dev_err(priv->dev, "[%u] %s re-arm low\n",
+					priv->sensor[i].hw_id, __func__);
+				/* unmask the interrupt for this sensor */
+				tsens_set_interrupt(priv, d, hw_id, LOWER, enable);
+			} else {
+				trigger = 1;
+				/* Keep irq masked */
+			}
+		}
+
+		spin_unlock_irqrestore(&priv->ul_lock, flags);
+
+		if (trigger) {
+			dev_err(priv->dev, "[%u] %s: TZ update trigger (%d mC)\n",
+				hw_id, __func__, temp);
+			thermal_zone_device_update(priv->sensor[i].tzd,
+						   THERMAL_EVENT_UNSPECIFIED);
+		}
+
+		/* TODO: REALLY??? */
+		mb();
+	}
+	return IRQ_HANDLED;
+}
+
+/**
+ * tsens_threshold_val - Return correct value to be written to threshold
+ * registers, whether in ADC code or deciCelsius depending on IP version
+ */
+static int tsens_threshold_val(struct tsens_sensor *s, int temp)
+{
+	struct tsens_priv *priv = s->priv;
+
+	if (priv->feat->adc) {
+		/* milli to C to adc code */
+		return degc_to_code(temp / 1000, s);
+	} else {
+		/* milli to deci C */
+		return (temp / 100);
+	}
+}
+
+int tsens_set_trips(void *_sensor, int low, int high)
+{
+	struct tsens_sensor *s = _sensor;
+	struct tsens_priv *priv = s->priv;
+	struct device *dev = priv->dev;
+	struct tsens_irq_data d;
+	unsigned long flags;
+	int high_val, low_val, cl_high, cl_low;
+	bool enable = true, disable = false;
+	u32 hw_id = s->hw_id;
+
+	dev_err(dev, "[%u] %s: proposed thresholds: (%d:%d)\n",
+		hw_id, __func__, low, high);
+	if (high == INT_MAX) {
+		dev_err(dev, "[%u] %s: Recvd INT_MAX\n", s->hw_id, __func__);
+		tsens_set_interrupt(priv, d, hw_id, UPPER, disable);
+	}
+	if (low == -INT_MAX) {
+		dev_err(dev, "[%u] %s: Recvd -INT_MAX\n", s->hw_id, __func__);
+		tsens_set_interrupt(priv, d, hw_id, LOWER, disable);
+	}
+
+	cl_high = clamp_val(high, -40000, 120000);
+	cl_low = clamp_val(low, -40000, 120000);
+
+	spin_lock_irqsave(&priv->ul_lock, flags);
+
+	tsens_read_irq_state(priv, hw_id, s, &d);
+
+	high_val = tsens_threshold_val(s, cl_high);
+	low_val = tsens_threshold_val(s, cl_low);
+
+	/* Write the new thresholds and clear the status */
+	if (d.low_thresh != low_val) {
+		regmap_field_write(priv->rf[LOW_THRESH_0 + hw_id], low_val);
+		tsens_set_interrupt(priv, d, hw_id, LOWER, enable);
+	}
+	if (d.up_thresh != high_val) {
+		regmap_field_write(priv->rf[UP_THRESH_0 + hw_id], high_val);
+		tsens_set_interrupt(priv, d, hw_id, UPPER, enable);
+	}
+
+	spin_unlock_irqrestore(&priv->ul_lock, flags);
+
+	dev_err(dev, "[%u] %s: threshold change (%d:%d)->(%d:%d)\n",
+		s->hw_id, __func__, d.low_thresh, d.up_thresh, cl_low, cl_high);
+	return 0;
+}
+
+int tsens_enable_irq(struct tsens_priv *priv)
+{
+	int ret;
+	int val = (tsens_ver(priv) > VER_1_X) ? 7 : 1;
+
+	ret = regmap_field_write(priv->rf[INT_EN], val);
+	if (ret < 0)
+		dev_err(priv->dev, "failed to enable interrupts\n");
+
+	return ret;
+}
+
+void tsens_disable_irq(struct tsens_priv *priv)
+{
+	regmap_field_write(priv->rf[INT_EN], 0);
 }
 
 int get_temp_tsens_valid(struct tsens_sensor *s, int *temp)
@@ -338,6 +700,88 @@ int __init init_common(struct tsens_priv *priv)
 			goto err_put_device;
 		}
 	}
+	for (i = 0, j = UPPER_STATUS_0; i < priv->feat->max_sensors; i++, j++) {
+		priv->rf[j] = devm_regmap_field_alloc(dev, priv->tm_map,
+						      priv->fields[j]);
+		if (IS_ERR(priv->rf[j])) {
+			ret = PTR_ERR(priv->rf[j]);
+			goto err_put_device;
+		}
+	}
+	for (i = 0, j = LOWER_STATUS_0; i < priv->feat->max_sensors; i++, j++) {
+		priv->rf[j] = devm_regmap_field_alloc(dev, priv->tm_map,
+						      priv->fields[j]);
+		if (IS_ERR(priv->rf[j])) {
+			ret = PTR_ERR(priv->rf[j]);
+			goto err_put_device;
+		}
+	}
+	for (i = 0, j = CRITICAL_STATUS_0; i < priv->feat->max_sensors; i++, j++) {
+		priv->rf[j] = devm_regmap_field_alloc(dev, priv->tm_map,
+						      priv->fields[j]);
+		if (IS_ERR(priv->rf[j])) {
+			ret = PTR_ERR(priv->rf[j]);
+			goto err_put_device;
+		}
+	}
+	for (i = 0, j = UP_THRESH_0; i < priv->feat->max_sensors; i++, j++) {
+		priv->rf[j] = devm_regmap_field_alloc(dev, priv->tm_map,
+						      priv->fields[j]);
+		if (IS_ERR(priv->rf[j])) {
+			ret = PTR_ERR(priv->rf[j]);
+			goto err_put_device;
+		}
+	}
+	for (i = 0, j = LOW_THRESH_0; i < priv->feat->max_sensors; i++, j++) {
+		priv->rf[j] = devm_regmap_field_alloc(dev, priv->tm_map,
+						      priv->fields[j]);
+		if (IS_ERR(priv->rf[j])) {
+			ret = PTR_ERR(priv->rf[j]);
+			goto err_put_device;
+		}
+	}
+	for (i = 0, j = UP_INT_CLEAR_0; i < priv->feat->max_sensors; i++, j++) {
+		priv->rf[j] = devm_regmap_field_alloc(dev, priv->tm_map,
+						      priv->fields[j]);
+		if (IS_ERR(priv->rf[j])) {
+			ret = PTR_ERR(priv->rf[j]);
+			goto err_put_device;
+		}
+	}
+	for (i = 0, j = LOW_INT_CLEAR_0; i < priv->feat->max_sensors; i++, j++) {
+		priv->rf[j] = devm_regmap_field_alloc(dev, priv->tm_map,
+						      priv->fields[j]);
+		if (IS_ERR(priv->rf[j])) {
+			ret = PTR_ERR(priv->rf[j]);
+			goto err_put_device;
+		}
+	}
+	for (i = 0, j = UP_INT_MASK_0; i < priv->feat->max_sensors; i++, j++) {
+		priv->rf[j] = devm_regmap_field_alloc(dev, priv->tm_map,
+						      priv->fields[j]);
+		if (IS_ERR(priv->rf[j])) {
+			ret = PTR_ERR(priv->rf[j]);
+			goto err_put_device;
+		}
+	}
+	for (i = 0, j = LOW_INT_MASK_0; i < priv->feat->max_sensors; i++, j++) {
+		priv->rf[j] = devm_regmap_field_alloc(dev, priv->tm_map,
+						      priv->fields[j]);
+		if (IS_ERR(priv->rf[j])) {
+			ret = PTR_ERR(priv->rf[j]);
+			goto err_put_device;
+		}
+	}
+
+	priv->rf[INT_EN] = devm_regmap_field_alloc(dev, priv->tm_map,
+						   priv->fields[INT_EN]);
+	if (IS_ERR(priv->rf[INT_EN])) {
+		ret = PTR_ERR(priv->rf[INT_EN]);
+		goto err_put_device;
+	}
+
+	tsens_enable_irq(priv);
+	spin_lock_init(&priv->ul_lock);
 
 	tsens_debug_init(op);
 
