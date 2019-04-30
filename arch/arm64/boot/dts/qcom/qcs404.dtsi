@@ -1073,8 +1073,8 @@
 
 	thermal-zones {
 		aoss-thermal {
-			polling-delay-passive = <250>;
-			polling-delay = <1000>;
+			polling-delay-passive = <0>;
+			polling-delay = <0>;
 
 			thermal-sensors = <&tsens 0>;
 
@@ -1088,8 +1088,8 @@
 		};
 
 		q6-hvx-thermal {
-			polling-delay-passive = <250>;
-			polling-delay = <1000>;
+			polling-delay-passive = <0>;
+			polling-delay = <0>;
 
 			thermal-sensors = <&tsens 1>;
 
@@ -1103,8 +1103,8 @@
 		};
 
 		lpass-thermal {
-			polling-delay-passive = <250>;
-			polling-delay = <1000>;
+			polling-delay-passive = <0>;
+			polling-delay = <0>;
 
 			thermal-sensors = <&tsens 2>;
 
@@ -1118,8 +1118,8 @@
 		};
 
 		wlan-thermal {
-			polling-delay-passive = <250>;
-			polling-delay = <1000>;
+			polling-delay-passive = <0>;
+			polling-delay = <0>;
 
 			thermal-sensors = <&tsens 3>;
 
@@ -1133,14 +1133,14 @@
 		};
 
 		cluster-thermal {
-			polling-delay-passive = <250>;
-			polling-delay = <1000>;
+			polling-delay-passive = <0>;
+			polling-delay = <0>;
 
 			thermal-sensors = <&tsens 4>;
 
 			trips {
 				cluster_alert0: trip-point@0 {
-					temperature = <95000>;
+					temperature = <75000>;
 					hysteresis = <2000>;
 					type = "hot";
 				};
@@ -1167,19 +1167,19 @@
 		};
 
 		cpu0-thermal {
-			polling-delay-passive = <250>;
-			polling-delay = <1000>;
+			polling-delay-passive = <0>;
+			polling-delay = <0>;
 
 			thermal-sensors = <&tsens 5>;
 
 			trips {
 				cpu0_alert0: trip-point@0 {
-					temperature = <95000>;
+					temperature = <32000>;
 					hysteresis = <2000>;
 					type = "hot";
 				};
 				cpu0_alert1: trip-point@1 {
-					temperature = <105000>;
+					temperature = <34000>;
 					hysteresis = <2000>;
 					type = "passive";
 				};
@@ -1201,14 +1201,14 @@
 		};
 
 		cpu1-thermal {
-			polling-delay-passive = <250>;
-			polling-delay = <1000>;
+			polling-delay-passive = <0>;
+			polling-delay = <0>;
 
 			thermal-sensors = <&tsens 6>;
 
 			trips {
 				cpu1_alert0: trip-point@0 {
-					temperature = <95000>;
+					temperature = <75000>;
 					hysteresis = <2000>;
 					type = "hot";
 				};
@@ -1235,14 +1235,14 @@
 		};
 
 		cpu2-thermal {
-			polling-delay-passive = <250>;
-			polling-delay = <1000>;
+			polling-delay-passive = <0>;
+			polling-delay = <0>;
 
 			thermal-sensors = <&tsens 7>;
 
 			trips {
 				cpu2_alert0: trip-point@0 {
-					temperature = <95000>;
+					temperature = <75000>;
 					hysteresis = <2000>;
 					type = "hot";
 				};
@@ -1269,19 +1269,19 @@
 		};
 
 		cpu3-thermal {
-			polling-delay-passive = <250>;
-			polling-delay = <1000>;
+			polling-delay-passive = <0>;
+			polling-delay = <0>;
 
 			thermal-sensors = <&tsens 8>;
 
 			trips {
 				cpu3_alert0: trip-point@0 {
-					temperature = <95000>;
+					temperature = <32000>;
 					hysteresis = <2000>;
 					type = "hot";
 				};
 				cpu3_alert1: trip-point@1 {
-					temperature = <105000>;
+					temperature = <34000>;
 					hysteresis = <2000>;
 					type = "passive";
 				};
@@ -1303,14 +1303,14 @@
 		};
 
 		gpu-thermal {
-			polling-delay-passive = <250>;
-			polling-delay = <1000>;
+			polling-delay-passive = <0>;
+			polling-delay = <0>;
 
 			thermal-sensors = <&tsens 9>;
 
 			trips {
 				gpu_alert0: trip-point@0 {
-					temperature = <95000>;
+					temperature = <105000>;
 					hysteresis = <2000>;
 					type = "hot";
 				};
