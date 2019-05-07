@@ -1,4 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-only
+CFLAGS_tsens-common.o          := -DDEBUG
+CFLAGS_tsens-v2.o              := -DDEBUG
+CFLAGS_tsens-v1.o              := -DDEBUG
+CFLAGS_tsens.o                 := -DDEBUG
 obj-$(CONFIG_QCOM_TSENS)	+= qcom_tsens.o
 
 qcom_tsens-y			+= tsens.o tsens-common.o tsens-v0_1.o \
