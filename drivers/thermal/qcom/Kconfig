@@ -20,3 +20,10 @@ config QCOM_SPMI_TEMP_ALARM
 	  trip points. The temperature reported by the thermal sensor reflects the
 	  real time die temperature if an ADC is present or an estimate of the
 	  temperature based upon the over temperature stage value.
+
+config QTI_QMI_COOLING_DEVICE
+	tristate "Qualcomm Cooling device for Remote processors"
+	depends on OF && QCOM_QMI_HELPERS
+	help
+	  This enables cooling devices for remote processors on Qualcomm SoCs.
+	  Communication is via the QMI interface.
