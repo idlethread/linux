@@ -21,7 +21,7 @@ config QCOM_SPMI_TEMP_ALARM
 	  real time die temperature if an ADC is present or an estimate of the
 	  temperature based upon the over temperature stage value.
 
-config QTI_QMI_COOLING_DEVICE
+config QCOM_QMI_COOLING_DEVICE
 	tristate "Qualcomm Cooling device for Remote processors"
 	depends on OF && QCOM_QMI_HELPERS
 	help
