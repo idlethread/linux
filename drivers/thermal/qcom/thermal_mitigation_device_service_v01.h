@@ -38,7 +38,6 @@ struct tmd_mitigation_dev_list_type_v01 {
 	uint8_t max_mitigation_level;
 };
 
-
 #define TMD_GET_MITIGATION_DEVICE_LIST_REQ_MSG_V01_MAX_MSG_LEN 0
 extern struct qmi_elem_info tmd_get_mitigation_device_list_req_msg_v01_ei[];
 struct tmd_get_mitigation_device_list_req_msg_v01 {
@@ -62,18 +61,20 @@ struct tmd_set_mitigation_level_req_msg_v01 {
 	uint8_t mitigation_level;
 };
 
+#define TMD_SET_MITIGATION_LEVEL_RESP_MSG_V01_MAX_MSG_LEN 7
+extern struct qmi_elem_info tmd_set_mitigation_level_resp_msg_v01_ei[];
 struct tmd_set_mitigation_level_resp_msg_v01 {
 	struct qmi_response_type_v01 resp;
 };
-#define TMD_SET_MITIGATION_LEVEL_RESP_MSG_V01_MAX_MSG_LEN 7
-extern struct qmi_elem_info tmd_set_mitigation_level_resp_msg_v01_ei[];
 
+#define TMD_GET_MITIGATION_LEVEL_REQ_MSG_V01_MAX_MSG_LEN 36
+extern struct qmi_elem_info tmd_get_mitigation_level_req_msg_v01_ei[];
 struct tmd_get_mitigation_level_req_msg_v01 {
 	struct tmd_mitigation_dev_id_type_v01 mitigation_device;
 };
-#define TMD_GET_MITIGATION_LEVEL_REQ_MSG_V01_MAX_MSG_LEN 36
-extern struct qmi_elem_info tmd_get_mitigation_level_req_msg_v01_ei[];
 
+#define TMD_GET_MITIGATION_LEVEL_RESP_MSG_V01_MAX_MSG_LEN 15
+extern struct qmi_elem_info tmd_get_mitigation_level_resp_msg_v01_ei[];
 struct tmd_get_mitigation_level_resp_msg_v01 {
 	struct qmi_response_type_v01 resp;
 	uint8_t current_mitigation_level_valid;
@@ -81,42 +82,40 @@ struct tmd_get_mitigation_level_resp_msg_v01 {
 	uint8_t requested_mitigation_level_valid;
 	uint8_t requested_mitigation_level;
 };
-#define TMD_GET_MITIGATION_LEVEL_RESP_MSG_V01_MAX_MSG_LEN 15
-extern struct qmi_elem_info tmd_get_mitigation_level_resp_msg_v01_ei[];
 
+#define TMD_REGISTER_NOTIFICATION_MITIGATION_LEVEL_REQ_MSG_V01_MAX_MSG_LEN 36
+extern struct qmi_elem_info
+tmd_register_notification_mitigation_level_req_msg_v01_ei[];
 struct tmd_register_notification_mitigation_level_req_msg_v01 {
 	struct tmd_mitigation_dev_id_type_v01 mitigation_device;
 };
-#define TMD_REGISTER_NOTIFICATION_MITIGATION_LEVEL_REQ_MSG_V01_MAX_MSG_LEN 36
-extern struct qmi_elem_info
-		tmd_register_notification_mitigation_level_req_msg_v01_ei[];
 
+#define TMD_REGISTER_NOTIFICATION_MITIGATION_LEVEL_RESP_MSG_V01_MAX_MSG_LEN 7
+extern struct qmi_elem_info
+tmd_register_notification_mitigation_level_resp_msg_v01_ei[];
 struct tmd_register_notification_mitigation_level_resp_msg_v01 {
 	struct qmi_response_type_v01 resp;
 };
-#define TMD_REGISTER_NOTIFICATION_MITIGATION_LEVEL_RESP_MSG_V01_MAX_MSG_LEN 7
-extern struct qmi_elem_info
-	tmd_register_notification_mitigation_level_resp_msg_v01_ei[];
 
+#define TMD_DEREGISTER_NOTIFICATION_MITIGATION_LEVEL_REQ_MSG_V01_MAX_MSG_LEN 36
+extern struct qmi_elem_info
+tmd_deregister_notification_mitigation_level_req_msg_v01_ei[];
 struct tmd_deregister_notification_mitigation_level_req_msg_v01 {
 	struct tmd_mitigation_dev_id_type_v01 mitigation_device;
 };
-#define TMD_DEREGISTER_NOTIFICATION_MITIGATION_LEVEL_REQ_MSG_V01_MAX_MSG_LEN 36
-extern struct qmi_elem_info
-	tmd_deregister_notification_mitigation_level_req_msg_v01_ei[];
 
+#define TMD_DEREGISTER_NOTIFICATION_MITIGATION_LEVEL_RESP_MSG_V01_MAX_MSG_LEN 7
+extern struct qmi_elem_info
+tmd_deregister_notification_mitigation_level_resp_msg_v01_ei[];
 struct tmd_deregister_notification_mitigation_level_resp_msg_v01 {
 	struct qmi_response_type_v01 resp;
 };
-#define TMD_DEREGISTER_NOTIFICATION_MITIGATION_LEVEL_RESP_MSG_V01_MAX_MSG_LEN 7
-extern struct qmi_elem_info
-	tmd_deregister_notification_mitigation_level_resp_msg_v01_ei[];
 
+#define TMD_MITIGATION_LEVEL_REPORT_IND_MSG_V01_MAX_MSG_LEN 40
+extern struct qmi_elem_info tmd_mitigation_level_report_ind_msg_v01_ei[];
 struct tmd_mitigation_level_report_ind_msg_v01 {
 	struct tmd_mitigation_dev_id_type_v01 mitigation_device;
 	uint8_t current_mitigation_level;
 };
-#define TMD_MITIGATION_LEVEL_REPORT_IND_MSG_V01_MAX_MSG_LEN 40
-extern struct qmi_elem_info tmd_mitigation_level_report_ind_msg_v01_ei[];
 
 #endif

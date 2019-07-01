@@ -351,4 +351,3 @@ struct qmi_elem_info tmd_mitigation_level_report_ind_msg_v01_ei[] = {
 		.tlv_type       = QMI_COMMON_TLV_TYPE,
 	},
 };
-
