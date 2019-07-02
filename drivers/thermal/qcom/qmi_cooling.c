@@ -264,8 +264,8 @@ static struct thermal_cooling_device_ops qmi_device_ops = {
 	.get_max_state = qmi_get_max_state,
 	.get_cur_state = qmi_get_cur_state,
 	.set_cur_state = qmi_set_cur_state,
-	.set_min_state = qmi_set_min_state,
-	.get_min_state = qmi_get_min_state,
+//	.set_min_state = qmi_set_min_state,
+//	.get_min_state = qmi_get_min_state,
 };
 
 static int qmi_register_cooling_device(struct qmi_cooling_device *qmi_cdev)
