@@ -31,13 +31,13 @@ struct qmi_cooling_device {
 	struct device_node		*np;
 	char				cdev_name[THERMAL_NAME_LENGTH];
 	char				qmi_name[QMI_CLIENT_NAME_LENGTH];
-	bool                            connection_active;
+	bool				connection_active;
 	enum qmi_device_type		type;
 	struct list_head		qmi_node;
 	struct thermal_cooling_device	*cdev;
 	unsigned int			mtgn_state;
 	unsigned int			max_level;
-	struct qmi_tmd_instance		*tmd;
+	struct qmi_tmd_instance	*tmd;
 };
 
 struct qmi_tmd_instance {
