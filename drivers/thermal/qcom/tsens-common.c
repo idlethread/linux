@@ -249,7 +249,6 @@ static int tsens_read_irq_state(struct tsens_priv *priv, u32 hw_id,
 				struct tsens_sensor *s, struct tsens_irq_data *d)
 {
 	int ret, up_temp, low_temp;
-	u32 mask;
 
 	if (hw_id > priv->num_sensors) {
 		dev_err(priv->dev, "%s Invalid hw_id\n", __func__);
@@ -287,17 +286,9 @@ static int tsens_read_irq_state(struct tsens_priv *priv, u32 hw_id,
 		d->low_irq_mask = 0;
 	}
 
-	if (priv->feat->adc) {
-		d->up_thresh = code_to_degc(up_temp, s) * 1000;
-		d->low_thresh = code_to_degc(low_temp, s) * 1000;
-	} else {
-		mask = GENMASK(priv->fields[LOW_THRESH_0].msb,
-			       priv->fields[LOW_THRESH_0].lsb);
-		dev_err(priv->dev, "mask: %d\n", fls(mask));
-		/* Convert temperature from deciCelsius to milliCelsius */
-		d->up_thresh = sign_extend32(up_temp, fls(mask) - 1) * 100;
-		d->low_thresh = sign_extend32(low_temp, fls(mask) - 1) * 100;
-	}
+	d->up_thresh = tsens_hw_to_mC("upthresh", s, UP_THRESH_0, up_temp);
+	d->low_thresh = tsens_hw_to_mC("lowthresh", s, LOW_THRESH_0, low_temp);
+
 	if (d->up_viol || d->low_viol) {
 		dev_err(priv->dev, "[%u] %s (viol): status: low(%u), up(%u) "
 			"| clr: low(%u), up(%u) | thresh: (%d:%d) | mask: low(%u), up(%u)\n",
@@ -391,10 +382,10 @@ irqreturn_t tsens_irq_thread(int irq, void *data)
 }
 
 /**
- * tsens_threshold_val - Return correct value to be written to threshold
+ * tsens_mC_to_hw - Return correct value to be written to threshold
  * registers, whether in ADC code or deciCelsius depending on IP version
  */
-static int tsens_threshold_val(struct tsens_sensor *s, int temp)
+static int tsens_mC_to_hw(struct tsens_sensor *s, int temp)
 {
 	struct tsens_priv *priv = s->priv;
 
@@ -432,8 +423,8 @@ int tsens_set_trips(void *_sensor, int low, int high)
 	cl_high = clamp_val(high, -40000, 120000);
 	cl_low = clamp_val(low, -40000, 120000);
 
-	high_val = tsens_threshold_val(s, cl_high);
-	low_val = tsens_threshold_val(s, cl_low);
+	high_val = tsens_mC_to_hw(s, cl_high);
+	low_val = tsens_mC_to_hw(s, cl_low);
 
 	spin_lock_irqsave(&priv->ul_lock, flags);
 
