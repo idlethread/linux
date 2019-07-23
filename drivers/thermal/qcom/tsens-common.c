@@ -227,6 +227,7 @@ static int tsens_read_irq_state(struct tsens_priv *priv, u32 hw_id,
 				struct tsens_sensor *s, struct tsens_irq_data *d)
 {
 	int ret, up_temp, low_temp;
+	u32 mask;
 
 	if (hw_id > priv->num_sensors) {
 		dev_err(priv->dev, "%s Invalid hw_id\n", __func__);
@@ -268,8 +269,12 @@ static int tsens_read_irq_state(struct tsens_priv *priv, u32 hw_id,
 		d->up_thresh = code_to_degc(up_temp, s) * 1000;
 		d->low_thresh = code_to_degc(low_temp, s) * 1000;
 	} else {
-		d->up_thresh = up_temp * 100;
-		d->low_thresh = low_temp * 100;
+		mask = GENMASK(priv->fields[LOW_THRESH_0].msb,
+			       priv->fields[LOW_THRESH_0].lsb);
+		dev_err(priv->dev, "mask: %d\n", fls(mask));
+		/* Convert temperature from deciCelsius to milliCelsius */
+		d->up_thresh = sign_extend32(up_temp, fls(mask) - 1) * 100;
+		d->low_thresh = sign_extend32(low_temp, fls(mask) - 1) * 100;
 	}
 	if (d->up_viol || d->low_viol) {
 		dev_err(priv->dev, "[%u] %s (viol): status: low(%u), up(%u) "
