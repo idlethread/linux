@@ -223,6 +223,28 @@ static void tsens_set_interrupt(struct tsens_priv *priv, const struct tsens_irq_
 		tsens_set_interrupt_v1(priv, d, hw_id, irq_type, enable);
 }
 
+/**
+ * tsens_hw_to_mC - Return properly sign extended temperature in mCelsius,
+ * whether in ADC code or deciCelsius depending on IP version.
+ * This function handles the different widths of the signed integer across IPs.
+ */
+static int tsens_hw_to_mC(char *str, struct tsens_sensor *s, int field, int temp) {
+	struct tsens_priv *priv = s->priv;
+	u32 mask;
+
+	if (priv->feat->adc) {
+		/* Convert temperature from ADC code to milliCelsius */
+		return code_to_degc(temp, s) * 1000;
+	} else {
+		mask = GENMASK(priv->fields[field].msb,
+			       priv->fields[field].lsb) >> priv->fields[field].lsb;
+		dev_dbg(priv->dev, "%s: mask: %d\n", str, fls(mask));
+		/* Convert temperature from deciCelsius to milliCelsius */
+		return sign_extend32(temp, fls(mask) - 1) * 100;
+
+	}
+}
+
 static int tsens_read_irq_state(struct tsens_priv *priv, u32 hw_id,
 				struct tsens_sensor *s, struct tsens_irq_data *d)
 {
@@ -457,7 +479,7 @@ int get_temp_tsens_valid(struct tsens_sensor *s, int *temp)
 	int hw_id = s->hw_id;
 	u32 temp_idx = LAST_TEMP_0 + hw_id;
 	u32 valid_idx = VALID_0 + hw_id;
-	u32 last_temp = 0, valid, mask;
+	u32 last_temp = 0, valid;
 	int ret;
 
 	ret = regmap_field_read(priv->rf[valid_idx], &valid);
@@ -479,15 +501,7 @@ int get_temp_tsens_valid(struct tsens_sensor *s, int *temp)
 	if (ret)
 		return ret;
 
-	if (priv->feat->adc) {
-		/* Convert temperature from ADC code to milliCelsius */
-		*temp = code_to_degc(last_temp, s) * 1000;
-	} else {
-		mask = GENMASK(priv->fields[LAST_TEMP_0].msb,
-			       priv->fields[LAST_TEMP_0].lsb);
-		/* Convert temperature from deciCelsius to milliCelsius */
-		*temp = sign_extend32(last_temp, fls(mask) - 1) * 100;
-	}
+	*temp = tsens_hw_to_mC("get_temp", s, LAST_TEMP_0, last_temp);
 
 	return 0;
 }
