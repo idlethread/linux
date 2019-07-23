@@ -405,12 +405,12 @@ int tsens_set_trips(void *_sensor, int low, int high)
 	cl_high = clamp_val(high, -40000, 120000);
 	cl_low = clamp_val(low, -40000, 120000);
 
+	high_val = tsens_threshold_val(s, cl_high);
+	low_val = tsens_threshold_val(s, cl_low);
+
 	spin_lock_irqsave(&priv->ul_lock, flags);
 
 	tsens_read_irq_state(priv, hw_id, s, &d);
-
-	high_val = tsens_threshold_val(s, cl_high);
-	low_val = tsens_threshold_val(s, cl_low);
 
 	/* Write the new thresholds and clear the status */
 	if (d.low_thresh != low_val) {
