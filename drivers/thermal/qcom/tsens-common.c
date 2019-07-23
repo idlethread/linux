@@ -166,9 +166,11 @@ static void tsens_set_interrupt_v2(struct tsens_priv *priv, const struct tsens_i
 	if (enable) {
 		switch (irq_type) {
 		case UPPER:
+			dev_err(priv->dev, "%s: enable upper\n", __func__);
 			regmap_field_write(priv->rf[UP_INT_MASK_0 + hw_id], 0);
 			break;
 		case LOWER:
+			dev_err(priv->dev, "%s: enable lower\n", __func__);
 			regmap_field_write(priv->rf[LOW_INT_MASK_0 + hw_id], 0);
 			break;
 		case CRITICAL:
@@ -185,11 +187,13 @@ static void tsens_set_interrupt_v2(struct tsens_priv *priv, const struct tsens_i
 		 */
 		switch (irq_type) {
 		case UPPER:
+			dev_err(priv->dev, "%s: disable upper\n", __func__);
 			regmap_field_write(priv->rf[UP_INT_MASK_0 + hw_id], 1);
 			regmap_field_write(priv->rf[UP_INT_CLEAR_0 + hw_id], 1);
 			regmap_field_write(priv->rf[UP_INT_CLEAR_0 + hw_id], 0);
 			break;
 		case LOWER:
+			dev_err(priv->dev, "%s: disable lower\n", __func__);
 			regmap_field_write(priv->rf[LOW_INT_MASK_0 + hw_id], 1);
 			regmap_field_write(priv->rf[LOW_INT_CLEAR_0 + hw_id], 1);
 			regmap_field_write(priv->rf[LOW_INT_CLEAR_0 + hw_id], 0);
@@ -294,6 +298,11 @@ static int tsens_read_irq_state(struct tsens_priv *priv, u32 hw_id,
 			"| clr: low(%u), up(%u) | thresh: (%d:%d) | mask: low(%u), up(%u)\n",
 			hw_id, __func__, d->low_viol, d->up_viol, d->low_irq_clear, d->up_irq_clear,
 			d->low_thresh, d->up_thresh, d->low_irq_mask, d->up_irq_mask);
+	} else {
+		dev_err(priv->dev, "[%u] %s: status: low(%u), up(%u) "
+			"| clr: low(%u), up(%u) | thresh: (%d:%d) | mask: low(%u), up(%u)\n",
+			hw_id, __func__, d->low_viol, d->up_viol, d->low_irq_clear, d->up_irq_clear,
+			d->low_thresh, d->up_thresh, d->low_irq_mask, d->up_irq_mask);
 	}
 	return 0;
 }
@@ -338,8 +347,6 @@ irqreturn_t tsens_irq_thread(int irq, void *data)
 
 		tsens_read_irq_state(priv, hw_id, s, &d);
 
-		dev_dbg(priv->dev, "[%u] irq_thread, temp: %d\n", hw_id, temp);
-
 		if (d.up_viol &&
 		    !masked_irq(hw_id, d.up_irq_mask, tsens_ver(priv))) {
 			tsens_set_interrupt(priv, d, hw_id, UPPER, disable);
@@ -373,11 +380,14 @@ irqreturn_t tsens_irq_thread(int irq, void *data)
 				hw_id, __func__, temp);
 			thermal_zone_device_update(priv->sensor[i].tzd,
 						   THERMAL_EVENT_UNSPECIFIED);
+		} else {
+			dev_err(priv->dev, "[%u] %s: no violation:  %d\n", hw_id, __func__, temp);
 		}
 
 		/* TODO: REALLY??? */
 		mb();
 	}
+	dev_err(priv->dev, "%s: return\n", __func__);
 	return IRQ_HANDLED;
 }
 
@@ -442,8 +452,8 @@ int tsens_set_trips(void *_sensor, int low, int high)
 
 	spin_unlock_irqrestore(&priv->ul_lock, flags);
 
-	dev_err(dev, "[%u] %s: threshold change (%d:%d)->(%d:%d)\n",
-		s->hw_id, __func__, d.low_thresh, d.up_thresh, cl_low, cl_high);
+	dev_err(dev, "[%u] %s: threshold change (%d:%d)->(%d:%d) [cl(%d:%d)]\n",
+		s->hw_id, __func__, d.low_thresh, d.up_thresh, low_val, high_val, cl_low, cl_high);
 	return 0;
 }
 
