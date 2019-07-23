@@ -89,7 +89,7 @@ static inline u32 degc_to_code(int degc, const struct tsens_sensor *sensor)
 		code = THRESHOLD_MAX_ADC_CODE;
 	else if (code < THRESHOLD_MIN_ADC_CODE)
 		code = THRESHOLD_MIN_ADC_CODE;
-	pr_debug("raw_code: 0x%x, degc:%d\n", code, degc);
+	pr_debug("%s, raw_code: 0x%x, degc:%d\n", __func__, code, degc);
 	return code;
 }
 
