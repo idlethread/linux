@@ -501,7 +501,7 @@
 
 			trips {
 				cpu0_alert0: trip-point@0 {
-					temperature = <75000>;
+					temperature = <35000>;
 					hysteresis = <2000>;
 					type = "passive";
 				};
@@ -585,7 +585,7 @@
 
 			trips {
 				cpu4_alert0: trip-point@0 {
-					temperature = <75000>;
+					temperature = <35000>;
 					hysteresis = <2000>;
 					type = "passive";
 				};
