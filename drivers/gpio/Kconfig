@@ -629,6 +629,7 @@ config GPIO_WCD934X
 
 config GPIO_XGENE
 	bool "APM X-Gene GPIO controller support"
+	depends on ARCH_XGENE
 	depends on ARM64 && OF_GPIO
 	help
 	  This driver is to support the GPIO block within the APM X-Gene SoC

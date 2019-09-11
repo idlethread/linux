@@ -289,6 +289,9 @@ config ARCH_VULCAN
 
 config ARCH_XGENE
 	bool "AppliedMicro X-Gene SOC Family"
+	select COMMON_CLK_XGENE
+	select PCI_XGENE
+	select GPIO_XGENE
 	help
 	  This enables support for AppliedMicro X-Gene SOC Family
 

@@ -191,7 +191,7 @@ config POWER_RESET_VEXPRESS
 
 config POWER_RESET_XGENE
 	bool "APM SoC X-Gene reset driver"
-	depends on ARM64
+	depends on ARCH_XGENE && ARM64
 	help
 	  Reboot support for the APM SoC X-Gene Eval boards.
 
