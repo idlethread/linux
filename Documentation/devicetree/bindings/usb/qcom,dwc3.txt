@@ -33,6 +33,16 @@ Optional clocks:
 
 Optional properties:
 - resets:		Phandle to reset control that resets core and wrapper.
+- interconnects:	Pairs of phandles and interconnect provider specifiers
+			to denote the edge source and destination ports of
+			the interconnect path. Please refer to
+			Documentation/devicetree/bindings/interconnect/
+			for more details.
+- interconnect-names:	List of interconnect path name strings sorted in the same
+			order as the interconnects property. Consumers drivers will use
+			interconnect-names to match interconnect paths with interconnect
+			specifiers. Please refer to Documentation/devicetree/bindings/
+			interconnect/ for more details.
 - interrupts:		specifies interrupts from controller wrapper used
 			to wakeup from low power/susepnd state.	Must contain
 			one or more entry for interrupt-names property
@@ -74,6 +84,9 @@ Example device nodes:
 			#size-cells = <1>;
 			ranges;
 
+			interconnects = <&qnoc MASTER_USB3_0 &qnoc SLAVE_EBI1>,
+					<&qnoc MASTER_APPSS_PROC &qnoc SLAVE_USB3_0>;
+			interconnect-names = "usb-ddr", "apps-usb";
 			interrupts = <0 131 0>, <0 486 0>, <0 488 0>, <0 489 0>;
 			interrupt-names = "hs_phy_irq", "ss_phy_irq",
 				  "dm_hs_phy_irq", "dp_hs_phy_irq";
