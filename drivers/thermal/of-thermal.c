@@ -412,7 +412,8 @@ static struct thermal_zone_device_ops of_thermal_ops = {
 static struct thermal_zone_device *
 thermal_zone_of_add_sensor(struct device_node *zone,
 			   struct device_node *sensor, void *data,
-			   const struct thermal_zone_of_device_ops *ops)
+			   const struct thermal_zone_of_device_ops *ops,
+			   bool force_interrupts)
 {
 	struct thermal_zone_device *tzd;
 	struct __thermal_zone *tz;
@@ -432,6 +433,11 @@ thermal_zone_of_add_sensor(struct device_node *zone,
 
 	tzd->ops->get_temp = of_thermal_get_temp;
 	tzd->ops->get_trend = of_thermal_get_trend;
+
+	if (force_interrupts) {
+		tz->passive_delay = 0;
+		tz->polling_delay = 0;
+	}
 
 	/*
 	 * The thermal zone core will calculate the window if they have set the
@@ -530,6 +536,7 @@ thermal_zone_of_sensor_register(struct device *dev, int sensor_id, void *data,
 {
 	struct device_node *np, *child, *sensor_np;
 	struct thermal_zone_device *tzd = ERR_PTR(-ENODEV);
+	bool force_interrupts = false;
 
 	np = of_find_node_by_name(NULL, "thermal-zones");
 	if (!np)
@@ -542,6 +549,9 @@ thermal_zone_of_sensor_register(struct device *dev, int sensor_id, void *data,
 
 	sensor_np = of_node_get(dev->of_node);
 
+	if (of_find_property(sensor_np, "interrupts", NULL))
+		force_interrupts = true;
+
 	for_each_available_child_of_node(np, child) {
 		int ret, id;
 
@@ -552,7 +562,8 @@ thermal_zone_of_sensor_register(struct device *dev, int sensor_id, void *data,
 
 		if (id == sensor_id) {
 			tzd = thermal_zone_of_add_sensor(child, sensor_np,
-							 data, ops);
+							 data, ops,
+							 force_interrupts);
 			if (!IS_ERR(tzd))
 				tzd->ops->set_mode(tzd, THERMAL_DEVICE_ENABLED);
 
