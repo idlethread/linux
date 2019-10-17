@@ -50,6 +50,7 @@ static int icc_summary_show(struct seq_file *s, void *data)
 	list_for_each_entry(provider, &icc_providers, provider_list) {
 		struct icc_node *n;
 
+		mutex_lock(&provider->lock);
 		list_for_each_entry(n, &provider->nodes, node_list) {
 			struct icc_req *r;
 
@@ -63,6 +64,7 @@ static int icc_summary_show(struct seq_file *s, void *data)
 					   r->peak_bw);
 			}
 		}
+		mutex_unlock(&provider->lock);
 	}
 
 	mutex_unlock(&icc_lock);
@@ -246,12 +248,15 @@ static int aggregate_requests(struct icc_node *node)
 	node->avg_bw = 0;
 	node->peak_bw = 0;
 
+	mutex_lock(&p->lock);
+
 	if (p->pre_aggregate)
 		p->pre_aggregate(node);
 
 	hlist_for_each_entry(r, &node->req_list, req_node)
 		p->aggregate(node, r->tag, r->avg_bw, r->peak_bw,
 			     &node->avg_bw, &node->peak_bw);
+	mutex_unlock(&p->lock);
 
 	return 0;
 }
@@ -261,6 +266,8 @@ static int apply_constraints(struct icc_path *path)
 	struct icc_node *next, *prev = NULL;
 	int ret = -EINVAL;
 	int i;
+
+	mutex_lock(&icc_lock);
 
 	for (i = 0; i < path->num_nodes; i++) {
 		next = path->reqs[i].node;
@@ -282,6 +289,8 @@ static int apply_constraints(struct icc_path *path)
 		prev = next;
 	}
 out:
+	mutex_unlock(&icc_lock);
+
 	return ret;
 }
 
@@ -501,8 +510,6 @@ int icc_set_bw(struct icc_path *path, u32 avg_bw, u32 peak_bw)
 	if (WARN_ON(IS_ERR(path)))
 		return -EINVAL;
 
-	mutex_lock(&icc_lock);
-
 	old_avg = path->reqs[0].avg_bw;
 	old_peak = path->reqs[0].peak_bw;
 
@@ -532,8 +539,6 @@ int icc_set_bw(struct icc_path *path, u32 avg_bw, u32 peak_bw)
 		}
 		apply_constraints(path);
 	}
-
-	mutex_unlock(&icc_lock);
 
 	trace_icc_set_bw_end(path, ret);
 
@@ -608,9 +613,11 @@ void icc_put(struct icc_path *path)
 	mutex_lock(&icc_lock);
 	for (i = 0; i < path->num_nodes; i++) {
 		node = path->reqs[i].node;
+		mutex_lock(&node->provider->lock);
 		hlist_del(&path->reqs[i].req_node);
 		if (!WARN_ON(!node->provider->users))
 			node->provider->users--;
+		mutex_unlock(&node->provider->lock);
 	}
 	mutex_unlock(&icc_lock);
 
@@ -791,8 +798,10 @@ void icc_node_add(struct icc_node *node, struct icc_provider *provider)
 {
 	mutex_lock(&icc_lock);
 
+	mutex_lock(&provider->lock);
 	node->provider = provider;
 	list_add_tail(&node->node_list, &provider->nodes);
+	mutex_unlock(&provider->lock);
 
 	mutex_unlock(&icc_lock);
 }
@@ -806,7 +815,9 @@ void icc_node_del(struct icc_node *node)
 {
 	mutex_lock(&icc_lock);
 
+	mutex_lock(&node->provider->lock);
 	list_del(&node->node_list);
+	mutex_unlock(&node->provider->lock);
 
 	mutex_unlock(&icc_lock);
 }
@@ -846,6 +857,8 @@ int icc_provider_add(struct icc_provider *provider)
 		return -EINVAL;
 	if (WARN_ON(!provider->xlate))
 		return -EINVAL;
+
+	mutex_init(&provider->lock);
 
 	mutex_lock(&icc_lock);
 
