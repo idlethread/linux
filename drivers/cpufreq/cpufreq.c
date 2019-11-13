@@ -1182,6 +1182,7 @@ static struct cpufreq_policy *cpufreq_policy_alloc(unsigned int cpu)
 	struct device *dev = get_cpu_device(cpu);
 	int ret;
 
+	pr_info("%s: %d\n", __func__, __LINE__);
 	if (!dev)
 		return NULL;
 
@@ -1240,6 +1241,7 @@ static struct cpufreq_policy *cpufreq_policy_alloc(unsigned int cpu)
 	INIT_WORK(&policy->update, handle_update);
 
 	policy->cpu = cpu;
+	pr_info("%s: %d\n", __func__, __LINE__);
 	return policy;
 
 err_min_qos_notifier:
@@ -1313,6 +1315,7 @@ static int cpufreq_online(unsigned int cpu)
 	/* Check if this CPU already has a policy to manage it */
 	policy = per_cpu(cpufreq_cpu_data, cpu);
 	if (policy) {
+		pr_info("%s: %d\n", __func__, __LINE__);
 		WARN_ON(!cpumask_test_cpu(cpu, policy->related_cpus));
 		if (!policy_is_inactive(policy))
 			return cpufreq_add_policy_cpu(policy, cpu);
@@ -1324,13 +1327,17 @@ static int cpufreq_online(unsigned int cpu)
 		policy->governor = NULL;
 		up_write(&policy->rwsem);
 	} else {
+		pr_info("%s: %d, cpu: %u\n", __func__, __LINE__, cpu);
 		new_policy = true;
 		policy = cpufreq_policy_alloc(cpu);
+		pr_info("%s: %d\n", __func__, __LINE__);
 		if (!policy)
 			return -ENOMEM;
+		pr_info("%s: %d\n", __func__, __LINE__);
 	}
 
 	if (!new_policy && cpufreq_driver->online) {
+	pr_info("%s: %d\n", __func__, __LINE__);
 		ret = cpufreq_driver->online(policy);
 		if (ret) {
 			pr_debug("%s: %d: initialization failed\n", __func__,
@@ -1341,12 +1348,14 @@ static int cpufreq_online(unsigned int cpu)
 		/* Recover policy->cpus using related_cpus */
 		cpumask_copy(policy->cpus, policy->related_cpus);
 	} else {
+		pr_info("%s: %d\n", __func__, __LINE__);
 		cpumask_copy(policy->cpus, cpumask_of(cpu));
 
 		/*
 		 * Call driver. From then on the cpufreq must be able
 		 * to accept all calls to ->verify and ->setpolicy for this CPU.
 		 */
+		pr_info("%s: %d\n", __func__, __LINE__);
 		ret = cpufreq_driver->init(policy);
 		if (ret) {
 			pr_debug("%s: %d: initialization failed\n", __func__,

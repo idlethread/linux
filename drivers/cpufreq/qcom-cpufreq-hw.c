@@ -242,6 +242,7 @@ static int qcom_cpufreq_hw_cpu_init(struct cpufreq_policy *policy)
 
 	policy->fast_switch_possible = true;
 
+	pr_err("%s: %d\n", __func__, __LINE__);
 	return 0;
 error:
 	devm_iounmap(dev, base);

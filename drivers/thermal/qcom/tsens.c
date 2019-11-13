@@ -203,6 +203,8 @@ static int tsens_probe(struct platform_device *pdev)
 		}
 	}
 
+	pr_info("%s: %d\n", __func__, __LINE__);
+
 	return tsens_register(priv);
 }
 
