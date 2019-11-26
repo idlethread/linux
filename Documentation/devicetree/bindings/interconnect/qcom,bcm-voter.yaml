@@ -19,6 +19,7 @@ description: |
 properties:
   compatible:
     enum:
+      - qcom,sc7180-bcm-voter
       - qcom,sdm845-bcm-voter
 
 required:
