@@ -128,6 +128,29 @@ unsigned long dev_pm_opp_get_freq(struct dev_pm_opp *opp)
 EXPORT_SYMBOL_GPL(dev_pm_opp_get_freq);
 
 /**
+ * dev_pm_opp_get_bw() - Gets the bandwidth corresponding to an available opp
+ * @opp:	opp for which peak bandwidth has to be returned for
+ * @avg_bw:	Pointer where the corresponding average bandwidth is stored.
+ *		Can be NULL.
+ *
+ * Return: Peak bandwidth in kBps corresponding to the opp, else
+ * return 0
+ */
+unsigned long dev_pm_opp_get_bw(struct dev_pm_opp *opp, unsigned long *avg_bw)
+{
+	if (IS_ERR_OR_NULL(opp) || !opp->available) {
+		pr_err("%s: Invalid parameters\n", __func__);
+		return 0;
+	}
+
+	if (avg_bw)
+		*avg_bw = opp->avg_bw;
+
+	return opp->peak_bw;
+}
+EXPORT_SYMBOL_GPL(dev_pm_opp_get_bw);
+
+/**
  * dev_pm_opp_get_level() - Gets the level corresponding to an available opp
  * @opp:	opp for which level value has to be returned for
  *
@@ -299,6 +322,34 @@ unsigned long dev_pm_opp_get_suspend_opp_freq(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(dev_pm_opp_get_suspend_opp_freq);
 
+/**
+ * dev_pm_opp_get_suspend_opp_bw() - Get peak bandwidth of suspend opp in kBps
+ * @dev:	device for which we do this operation
+ * @avg_bw:	Pointer where the corresponding average bandwidth is stored.
+ *		Can be NULL.
+ *
+ * Return: This function returns the peak bandwidth of the OPP marked as
+ * suspend_opp if one is available, else returns 0;
+ */
+unsigned long dev_pm_opp_get_suspend_opp_bw(struct device *dev,
+					    unsigned long *avg_bw)
+{
+	struct opp_table *opp_table;
+	unsigned long peak_bw = 0;
+
+	opp_table = _find_opp_table(dev);
+	if (IS_ERR(opp_table))
+		return 0;
+
+	if (opp_table->suspend_opp && opp_table->suspend_opp->available)
+		peak_bw = dev_pm_opp_get_bw(opp_table->suspend_opp, avg_bw);
+
+	dev_pm_opp_put_opp_table(opp_table);
+
+	return peak_bw;
+}
+EXPORT_SYMBOL_GPL(dev_pm_opp_get_suspend_opp_bw);
+
 int _get_opp_count(struct opp_table *opp_table)
 {
 	struct dev_pm_opp *opp;
@@ -343,6 +394,40 @@ int dev_pm_opp_get_opp_count(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(dev_pm_opp_get_opp_count);
 
+struct dev_pm_opp *dev_pm_opp_find_opp_exact(struct device *dev,
+					      struct dev_pm_opp *opp_key,
+					      bool available)
+{
+	struct opp_table *opp_table;
+	struct dev_pm_opp *temp_opp, *opp = ERR_PTR(-ERANGE);
+
+	opp_table = _find_opp_table(dev);
+	if (IS_ERR(opp_table)) {
+		int r = PTR_ERR(opp_table);
+
+		dev_err(dev, "%s: OPP table not found (%d)\n", __func__, r);
+		return ERR_PTR(r);
+	}
+
+	mutex_lock(&opp_table->lock);
+
+	list_for_each_entry(temp_opp, &opp_table->opp_list, node) {
+		if (temp_opp->available == available &&
+		    !opp_compare_key(temp_opp, opp_key)) {
+			opp = temp_opp;
+
+			/* Increment the reference count of OPP */
+			dev_pm_opp_get(opp);
+			break;
+		}
+	}
+
+	mutex_unlock(&opp_table->lock);
+	dev_pm_opp_put_opp_table(opp_table);
+
+	return opp;
+}
+
 /**
  * dev_pm_opp_find_freq_exact() - search for an exact frequency
  * @dev:		device for which we do this operation
@@ -370,36 +455,53 @@ struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
 					      unsigned long freq,
 					      bool available)
 {
-	struct opp_table *opp_table;
-	struct dev_pm_opp *temp_opp, *opp = ERR_PTR(-ERANGE);
+	struct dev_pm_opp opp_key;
 
-	opp_table = _find_opp_table(dev);
-	if (IS_ERR(opp_table)) {
-		int r = PTR_ERR(opp_table);
+	opp_key.rate = freq;
+	opp_key.peak_bw = 0;
+	opp_key.level = 0;
 
-		dev_err(dev, "%s: OPP table not found (%d)\n", __func__, r);
-		return ERR_PTR(r);
-	}
-
-	mutex_lock(&opp_table->lock);
-
-	list_for_each_entry(temp_opp, &opp_table->opp_list, node) {
-		if (temp_opp->available == available &&
-				temp_opp->rate == freq) {
-			opp = temp_opp;
-
-			/* Increment the reference count of OPP */
-			dev_pm_opp_get(opp);
-			break;
-		}
-	}
-
-	mutex_unlock(&opp_table->lock);
-	dev_pm_opp_put_opp_table(opp_table);
-
-	return opp;
+	return dev_pm_opp_find_opp_exact(dev, &opp_key, available);
 }
 EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_exact);
+
+/**
+ * dev_pm_opp_find_peak_bw_exact() - search for an exact peak bandwidth
+ * @dev:		device for which we do this operation
+ * @peak_bw:		peak bandwidth to search for
+ * @available:		true/false - match for available opp
+ *
+ * Return: Searches for exact match in the opp table and returns pointer to the
+ * matching opp if found, else returns ERR_PTR in case of error and should
+ * be handled using IS_ERR. Error return values can be:
+ * EINVAL:	for bad pointer
+ * ERANGE:	no match found for search
+ * ENODEV:	if device not found in list of registered devices
+ *
+ * Note: available is a modifier for the search. if available=true, then the
+ * match is for exact matching peak bandwidth and is available in the stored
+ * OPP table. if false, the match is for exact peak bandwidth which is not
+ * available.
+ *
+ * This provides a mechanism to enable an opp which is not available currently
+ * or the opposite as well.
+ *
+ * The callers are required to call dev_pm_opp_put() for the returned OPP after
+ * use.
+ */
+struct dev_pm_opp *dev_pm_opp_find_peak_bw_exact(struct device *dev,
+						 unsigned int peak_bw,
+						 bool available)
+{
+	struct dev_pm_opp opp_key;
+
+	opp_key.rate = 0;
+	opp_key.peak_bw = peak_bw;
+	opp_key.level = 0;
+
+	return dev_pm_opp_find_opp_exact(dev, &opp_key, available);
+}
+EXPORT_SYMBOL_GPL(dev_pm_opp_find_peak_bw_exact);
 
 /**
  * dev_pm_opp_find_level_exact() - search for an exact level
@@ -449,18 +551,17 @@ struct dev_pm_opp *dev_pm_opp_find_level_exact(struct device *dev,
 }
 EXPORT_SYMBOL_GPL(dev_pm_opp_find_level_exact);
 
-static noinline struct dev_pm_opp *_find_freq_ceil(struct opp_table *opp_table,
-						   unsigned long *freq)
+static struct dev_pm_opp *_find_opp_ceil(struct opp_table *opp_table,
+					 struct dev_pm_opp *opp_key)
 {
 	struct dev_pm_opp *temp_opp, *opp = ERR_PTR(-ERANGE);
 
 	mutex_lock(&opp_table->lock);
 
 	list_for_each_entry(temp_opp, &opp_table->opp_list, node) {
-		if (temp_opp->available && temp_opp->rate >= *freq) {
+		if (temp_opp->available &&
+		    opp_compare_key(temp_opp, opp_key) >= 0) {
 			opp = temp_opp;
-			*freq = opp->rate;
-
 			/* Increment the reference count of OPP */
 			dev_pm_opp_get(opp);
 			break;
@@ -468,6 +569,23 @@ static noinline struct dev_pm_opp *_find_freq_ceil(struct opp_table *opp_table,
 	}
 
 	mutex_unlock(&opp_table->lock);
+
+	return opp;
+}
+
+static noinline struct dev_pm_opp *_find_freq_ceil(struct opp_table *opp_table,
+						   unsigned long *freq)
+{
+	struct dev_pm_opp opp_key, *opp;
+
+	opp_key.rate = *freq;
+	opp_key.peak_bw = 0;
+	opp_key.level = 0;
+
+	opp = _find_opp_ceil(opp_table, &opp_key);
+
+	if (!IS_ERR(opp))
+		*freq = opp->rate;
 
 	return opp;
 }
@@ -514,6 +632,86 @@ struct dev_pm_opp *dev_pm_opp_find_freq_ceil(struct device *dev,
 EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_ceil);
 
 /**
+ * dev_pm_opp_find_peak_bw_ceil() - Search for an rounded ceil peak bandwidth
+ * @dev:	device for which we do this operation
+ * @peak_bw:	Start peak bandwidth
+ *
+ * Search for the matching ceil *available* OPP from a starting peak bandwidth
+ * for a device.
+ *
+ * Return: matching *opp and refreshes *peak_bw accordingly, else returns
+ * ERR_PTR in case of error and should be handled using IS_ERR. Error return
+ * values can be:
+ * EINVAL:	for bad pointer
+ * ERANGE:	no match found for search
+ * ENODEV:	if device not found in list of registered devices
+ *
+ * The callers are required to call dev_pm_opp_put() for the returned OPP after
+ * use.
+ */
+struct dev_pm_opp *dev_pm_opp_find_peak_bw_ceil(struct device *dev,
+						unsigned long *peak_bw)
+{
+	struct opp_table *opp_table;
+	struct dev_pm_opp *opp;
+	struct dev_pm_opp opp_key;
+
+	if (!dev || !peak_bw) {
+		dev_err(dev, "%s: Invalid argument peak_bw=%p\n", __func__,
+			peak_bw);
+		return ERR_PTR(-EINVAL);
+	}
+
+	opp_table = _find_opp_table(dev);
+	if (IS_ERR(opp_table))
+		return ERR_CAST(opp_table);
+
+	opp_key.rate = 0;
+	opp_key.peak_bw = *peak_bw;
+	opp_key.level = 0;
+	opp = _find_opp_ceil(opp_table, &opp_key);
+
+	if (!IS_ERR(opp))
+		*peak_bw = opp->rate;
+
+	dev_pm_opp_put_opp_table(opp_table);
+
+	return opp;
+}
+EXPORT_SYMBOL_GPL(dev_pm_opp_find_peak_bw_ceil);
+
+struct dev_pm_opp *dev_pm_opp_find_opp_floor(struct device *dev,
+					     struct dev_pm_opp *opp_key)
+{
+	struct opp_table *opp_table;
+	struct dev_pm_opp *temp_opp, *opp = ERR_PTR(-ERANGE);
+
+	opp_table = _find_opp_table(dev);
+	if (IS_ERR(opp_table))
+		return ERR_CAST(opp_table);
+
+	mutex_lock(&opp_table->lock);
+
+	list_for_each_entry(temp_opp, &opp_table->opp_list, node) {
+		if (temp_opp->available) {
+			/* go to the next node, before choosing prev */
+			if (opp_compare_key(temp_opp, opp_key) > 0)
+				break;
+			else
+				opp = temp_opp;
+		}
+	}
+
+	/* Increment the reference count of OPP */
+	if (!IS_ERR(opp))
+		dev_pm_opp_get(opp);
+	mutex_unlock(&opp_table->lock);
+	dev_pm_opp_put_opp_table(opp_table);
+
+	return opp;
+}
+
+/**
  * dev_pm_opp_find_freq_floor() - Search for a rounded floor freq
  * @dev:	device for which we do this operation
  * @freq:	Start frequency
@@ -534,35 +732,18 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_ceil);
 struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
 					      unsigned long *freq)
 {
-	struct opp_table *opp_table;
-	struct dev_pm_opp *temp_opp, *opp = ERR_PTR(-ERANGE);
+	struct dev_pm_opp opp_key, *opp;
 
 	if (!dev || !freq) {
 		dev_err(dev, "%s: Invalid argument freq=%p\n", __func__, freq);
 		return ERR_PTR(-EINVAL);
 	}
 
-	opp_table = _find_opp_table(dev);
-	if (IS_ERR(opp_table))
-		return ERR_CAST(opp_table);
+	opp_key.rate = *freq;
+	opp_key.peak_bw = 0;
+	opp_key.level = 0;
 
-	mutex_lock(&opp_table->lock);
-
-	list_for_each_entry(temp_opp, &opp_table->opp_list, node) {
-		if (temp_opp->available) {
-			/* go to the next node, before choosing prev */
-			if (temp_opp->rate > *freq)
-				break;
-			else
-				opp = temp_opp;
-		}
-	}
-
-	/* Increment the reference count of OPP */
-	if (!IS_ERR(opp))
-		dev_pm_opp_get(opp);
-	mutex_unlock(&opp_table->lock);
-	dev_pm_opp_put_opp_table(opp_table);
+	opp = dev_pm_opp_find_opp_floor(dev, &opp_key);
 
 	if (!IS_ERR(opp))
 		*freq = opp->rate;
@@ -570,6 +751,48 @@ struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
 	return opp;
 }
 EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_floor);
+
+/**
+ * dev_pm_opp_find_peak_bw_floor() - Search for a rounded floor peak bandwidth
+ * @dev:	device for which we do this operation
+ * @peak_bw:	Start peak bandwidth
+ *
+ * Search for the matching floor *available* OPP from a starting peak bandwidth
+ * for a device.
+ *
+ * Return: matching *opp and refreshes *peak_bw accordingly, else returns
+ * ERR_PTR in case of error and should be handled using IS_ERR. Error return
+ * values can be:
+ * EINVAL:	for bad pointer
+ * ERANGE:	no match found for search
+ * ENODEV:	if device not found in list of registered devices
+ *
+ * The callers are required to call dev_pm_opp_put() for the returned OPP after
+ * use.
+ */
+struct dev_pm_opp *dev_pm_opp_find_peak_bw_floor(struct device *dev,
+						 unsigned int *peak_bw)
+{
+	struct dev_pm_opp opp_key, *opp;
+
+	if (!dev || !peak_bw) {
+		dev_err(dev, "%s: Invalid argument peak_bw=%p\n", __func__,
+			peak_bw);
+		return ERR_PTR(-EINVAL);
+	}
+
+	opp_key.rate = 0;
+	opp_key.peak_bw = *peak_bw;
+	opp_key.level = 0;
+
+	opp = dev_pm_opp_find_opp_floor(dev, &opp_key);
+
+	if (!IS_ERR(opp))
+		*peak_bw = opp->peak_bw;
+
+	return opp;
+}
+EXPORT_SYMBOL_GPL(dev_pm_opp_find_peak_bw_floor);
 
 /**
  * dev_pm_opp_find_freq_ceil_by_volt() - Find OPP with highest frequency for
