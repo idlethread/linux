@@ -25,7 +25,8 @@ struct tsens_priv;
 
 /* IP version numbers in ascending order */
 enum tsens_ver {
-	VER_0_1 = 0,
+	VER_8960 = 0,
+	VER_0_1,
 	VER_1_X,
 	VER_2_X,
 };
