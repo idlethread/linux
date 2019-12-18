@@ -751,10 +751,10 @@
 			#size-cells = <2>;
 			ranges;
 
-			interconnects = <&rsc_hlos MASTER_BLSP_1
-					&rsc_hlos SLAVE_EBI1>,
-					<&rsc_hlos MASTER_APPSS_PROC
-					&rsc_hlos SLAVE_BLSP_1>;
+			interconnects = <&apps_bcm_voter MASTER_BLSP_1
+					 &apps_bcm_voter SLAVE_EBI1>,
+					<&apps_bcm_voter MASTER_APPSS_PROC
+					 &apps_bcm_voter SLAVE_BLSP_1>;
 			interconnect-names = "qup-memory", "qup-config";
 
 			status = "disabled";
@@ -1066,10 +1066,10 @@
 			#size-cells = <2>;
 			ranges;
 
-			interconnects = <&rsc_hlos MASTER_BLSP_2
-					&rsc_hlos SLAVE_EBI1>,
-					<&rsc_hlos MASTER_APPSS_PROC
-					&rsc_hlos SLAVE_BLSP_2>;
+			interconnects = <&apps_bcm_voter MASTER_BLSP_2
+					 &apps_bcm_voter SLAVE_EBI1>,
+					<&apps_bcm_voter MASTER_APPSS_PROC
+					 &apps_bcm_voter SLAVE_BLSP_2>;
 			interconnect-names = "qup-memory", "qup-config";
 
 			status = "disabled";
