@@ -2574,10 +2574,10 @@
 
 			resets = <&gcc GCC_USB30_PRIM_BCR>;
 
-			interconnects = <&rsc_hlos MASTER_USB3_0
-					 &rsc_hlos SLAVE_EBI1>,
-					<&rsc_hlos MASTER_APPSS_PROC
-					 &rsc_hlos SLAVE_USB3_0>;
+			interconnects = <&apps_bcm_voter MASTER_USB3_0
+					 &apps_bcm_voter SLAVE_EBI1>,
+					<&apps_bcm_voter MASTER_APPSS_PROC
+					 &apps_bcm_voter SLAVE_USB3_0>;
 			interconnect-names = "usb-ddr", "apps-usb";
 
 			usb_1_dwc3: dwc3@a600000 {
@@ -2624,10 +2624,10 @@
 
 			resets = <&gcc GCC_USB30_SEC_BCR>;
 
-			interconnects = <&rsc_hlos MASTER_USB3_1
-					 &rsc_hlos SLAVE_EBI1>,
-					<&rsc_hlos MASTER_APPSS_PROC
-					 &rsc_hlos SLAVE_USB3_1>;
+			interconnects = <&apps_bcm_voter MASTER_USB3_1
+					 &apps_bcm_voter SLAVE_EBI1>,
+					<&apps_bcm_voter MASTER_APPSS_PROC
+					 &apps_bcm_voter SLAVE_USB3_1>;
 			interconnect-names = "usb-ddr", "apps-usb";
 
 			usb_2_dwc3: dwc3@a800000 {
