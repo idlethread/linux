@@ -390,6 +390,8 @@ int update_thermal_load_avg(u64 now, struct rq *rq, u64 capacity)
 			       capacity,
 			       capacity)) {
 		___update_load_avg(&rq->avg_thermal, 1, 1);
+		if (rq->avg_thermal.load_avg)
+			pr_err("cpu %d, %ld\n", cpu_of(rq), rq->avg_thermal.load_avg); 
 		trace_pelt_thermal_tp(rq);
 		return 1;
 	}
