@@ -119,6 +119,35 @@ static int get_spi_clk_cfg(unsigned int speed_hz,
 	return ret;
 }
 
+static int geni_spi_icc_get(struct geni_se *se)
+{
+	if (!se)
+		return -EINVAL;
+
+	se->icc_path[GENI_TO_CORE] = of_icc_get(se->dev, "qup-core");
+	if (IS_ERR(se->icc_path[GENI_TO_CORE]))
+		return PTR_ERR(se->icc_path[GENI_TO_CORE]);
+
+	se->icc_path[CPU_TO_GENI] = of_icc_get(se->dev, "qup-config");
+	if (IS_ERR(se->icc_path[CPU_TO_GENI])) {
+		icc_put(se->icc_path[GENI_TO_CORE]);
+		se->icc_path[GENI_TO_CORE] = NULL;
+		return PTR_ERR(se->icc_path[CPU_TO_GENI]);
+	}
+
+	return 0;
+}
+
+void geni_spi_icc_put(struct geni_se *se)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(se->icc_path); i++) {
+		icc_put(se->icc_path[i]);
+		se->icc_path[i] = NULL;
+	}
+}
+
 static void handle_fifo_timeout(struct spi_master *spi,
 				struct spi_message *msg)
 {
@@ -234,6 +263,11 @@ static int setup_fifo_params(struct spi_device *spi_slv,
 							ret, mas->cur_speed_hz);
 		return ret;
 	}
+
+	/* Set BW quota for CPU as driver supports FIFO mode only */
+	se->avg_bw_cpu = Bps_to_icc(mas->cur_speed_hz);
+	se->peak_bw_cpu = Bps_to_icc(2 * mas->cur_speed_hz);
+	icc_set_bw(se->icc_path[CPU_TO_GENI], se->avg_bw_cpu, se->peak_bw_cpu);
 
 	clk_sel = idx & CLK_SEL_MSK;
 	m_clk_cfg = (div << CLK_DIV_SHFT) | SER_CLK_EN;
@@ -581,14 +615,21 @@ static int spi_geni_probe(struct platform_device *pdev)
 	spin_lock_init(&mas->lock);
 	pm_runtime_enable(&pdev->dev);
 
+	ret = geni_spi_icc_get(&mas->se);
+	/* Set the bus quota to a reasonable value */
+	mas->se.avg_bw_core = Bps_to_icc(CORE_2X_50_MHZ);
+	mas->se.peak_bw_core = Bps_to_icc(CORE_2X_100_MHZ);
+	mas->se.avg_bw_cpu = Bps_to_icc(1000);
+	mas->se.peak_bw_cpu = Bps_to_icc(1000);
+
 	ret = spi_geni_init(mas);
 	if (ret)
-		goto spi_geni_probe_runtime_disable;
+		goto spi_geni_icc_put;
 
 	ret = request_irq(mas->irq, geni_spi_isr,
 			IRQF_TRIGGER_HIGH, "spi_geni", spi);
 	if (ret)
-		goto spi_geni_probe_runtime_disable;
+		goto spi_geni_icc_put;
 
 	ret = spi_register_master(spi);
 	if (ret)
@@ -597,6 +638,8 @@ static int spi_geni_probe(struct platform_device *pdev)
 	return 0;
 spi_geni_probe_free_irq:
 	free_irq(mas->irq, spi);
+spi_geni_icc_put:
+	geni_spi_icc_put(&mas->se);
 spi_geni_probe_runtime_disable:
 	pm_runtime_disable(&pdev->dev);
 	spi_master_put(spi);
@@ -612,22 +655,36 @@ static int spi_geni_remove(struct platform_device *pdev)
 	spi_unregister_master(spi);
 
 	free_irq(mas->irq, spi);
+	geni_spi_icc_put(&mas->se);
 	pm_runtime_disable(&pdev->dev);
 	return 0;
 }
 
 static int __maybe_unused spi_geni_runtime_suspend(struct device *dev)
 {
+	int ret;
 	struct spi_master *spi = dev_get_drvdata(dev);
 	struct spi_geni_master *mas = spi_master_get_devdata(spi);
 
-	return geni_se_resources_off(&mas->se);
+	ret = geni_se_resources_off(&mas->se);
+	if (ret)
+		return ret;
+
+	icc_set_bw(mas->se.icc_path[GENI_TO_CORE], 0, 0);
+	icc_set_bw(mas->se.icc_path[CPU_TO_GENI], 0, 0);
+
+	return 0;
 }
 
 static int __maybe_unused spi_geni_runtime_resume(struct device *dev)
 {
 	struct spi_master *spi = dev_get_drvdata(dev);
 	struct spi_geni_master *mas = spi_master_get_devdata(spi);
+
+	icc_set_bw(mas->se.icc_path[GENI_TO_CORE], mas->se.avg_bw_core,
+		mas->se.peak_bw_core);
+	icc_set_bw(mas->se.icc_path[CPU_TO_GENI], mas->se.avg_bw_cpu,
+		mas->se.peak_bw_cpu);
 
 	return geni_se_resources_on(&mas->se);
 }
