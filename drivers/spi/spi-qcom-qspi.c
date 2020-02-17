@@ -2,6 +2,7 @@
 // Copyright (c) 2017-2018, The Linux foundation. All rights reserved.
 
 #include <linux/clk.h>
+#include <linux/interconnect.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/module.h>
@@ -134,12 +135,19 @@ enum qspi_clocks {
 	QSPI_NUM_CLKS
 };
 
+enum qspi_icc_path {
+	CPU_TO_QSPI
+};
+
 struct qcom_qspi {
 	void __iomem *base;
 	struct device *dev;
 	struct clk_bulk_data *clks;
 	struct qspi_xfer xfer;
-	/* Lock to protect xfer and IRQ accessed registers */
+	struct icc_path *icc_path[2];
+	unsigned int avg_bw_cpu;
+	unsigned int peak_bw_cpu;
+	/* Lock to protect data accessed by IRQs */
 	spinlock_t lock;
 };
 
@@ -240,6 +248,11 @@ static int qcom_qspi_transfer_one(struct spi_master *master,
 		dev_err(ctrl->dev, "Failed to set core clk %d\n", ret);
 		return ret;
 	}
+
+	/* Set BW quota for CPU as driver supports FIFO mode only */
+	ctrl->avg_bw_cpu = Bps_to_icc(speed_hz);
+	ctrl->peak_bw_cpu = Bps_to_icc(2 * speed_hz);
+	icc_set_bw(ctrl->icc_path[CPU_TO_QSPI], ctrl->avg_bw_cpu, ctrl->peak_bw_cpu);
 
 	spin_lock_irqsave(&ctrl->lock, flags);
 
@@ -458,14 +471,23 @@ static int qcom_qspi_probe(struct platform_device *pdev)
 	if (ret)
 		goto exit_probe_master_put;
 
+	ctrl->icc_path[CPU_TO_QSPI] = of_icc_get(dev, "qspi-config");
+	if (IS_ERR(ctrl->icc_path[CPU_TO_QSPI])) {
+		ret = PTR_ERR(ctrl->icc_path[CPU_TO_QSPI]);
+		goto exit_probe_master_put;
+	}
+	/* Put BW vote on CPU path for register access */
+	ctrl->avg_bw_cpu = Bps_to_icc(1000);
+	ctrl->peak_bw_cpu = Bps_to_icc(1000);
+
 	ret = platform_get_irq(pdev, 0);
 	if (ret < 0)
-		goto exit_probe_master_put;
+		goto exit_probe_icc_put;
 	ret = devm_request_irq(dev, ret, qcom_qspi_irq,
 			IRQF_TRIGGER_HIGH, dev_name(dev), ctrl);
 	if (ret) {
 		dev_err(dev, "Failed to request irq %d\n", ret);
-		goto exit_probe_master_put;
+		goto exit_probe_icc_put;
 	}
 
 	master->max_speed_hz = 300000000;
@@ -489,6 +511,8 @@ static int qcom_qspi_probe(struct platform_device *pdev)
 
 	pm_runtime_disable(dev);
 
+exit_probe_icc_put:
+	icc_put(ctrl->icc_path[CPU_TO_QSPI]);
 exit_probe_master_put:
 	spi_master_put(master);
 
@@ -498,6 +522,9 @@ exit_probe_master_put:
 static int qcom_qspi_remove(struct platform_device *pdev)
 {
 	struct spi_master *master = platform_get_drvdata(pdev);
+	struct qcom_qspi *ctrl = spi_master_get_devdata(master);
+
+	icc_put(ctrl->icc_path[CPU_TO_QSPI]);
 
 	/* Unregister _before_ disabling pm_runtime() so we stop transfers */
 	spi_unregister_master(master);
@@ -514,6 +541,8 @@ static int __maybe_unused qcom_qspi_runtime_suspend(struct device *dev)
 
 	clk_bulk_disable_unprepare(QSPI_NUM_CLKS, ctrl->clks);
 
+	icc_set_bw(ctrl->icc_path[CPU_TO_QSPI], 0, 0);
+
 	return 0;
 }
 
@@ -521,6 +550,9 @@ static int __maybe_unused qcom_qspi_runtime_resume(struct device *dev)
 {
 	struct spi_master *master = dev_get_drvdata(dev);
 	struct qcom_qspi *ctrl = spi_master_get_devdata(master);
+
+	icc_set_bw(ctrl->icc_path[CPU_TO_QSPI], ctrl->avg_bw_cpu,
+		ctrl->peak_bw_cpu);
 
 	return clk_bulk_prepare_enable(QSPI_NUM_CLKS, ctrl->clks);
 }
