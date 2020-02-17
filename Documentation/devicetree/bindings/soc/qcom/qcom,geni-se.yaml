@@ -165,6 +165,15 @@ patternProperties:
           - description: UART core irq
           - description: Wakeup irq (RX GPIO)
 
+      rx-tx-swap:
+        description: RX and TX pins are swap.
+
+      cts-rts-swap:
+        description: CTS and RTS pins are swap.
+
+      rx-tx-cts-rts-swap:
+        description: RX-TX and CTS-RTS both pairs are swap.
+
     required:
       - compatible
       - interrupts
