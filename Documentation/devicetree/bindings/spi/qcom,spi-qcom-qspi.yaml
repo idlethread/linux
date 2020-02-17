@@ -47,6 +47,14 @@ properties:
   "#size-cells":
     const: 0
 
+  interconnects:
+    maxItems: 2
+
+  interconnect-names:
+    items:
+      - const: qspi-config
+      - const: qspi-memory
+
 required:
   - compatible
   - reg
