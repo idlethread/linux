@@ -10,7 +10,7 @@ Required properties:
   - "socionext,uniphier-ld20-thermal" : For UniPhier LD20 SoC
   - "socionext,uniphier-pxs3-thermal" : For UniPhier PXs3 SoC
 - interrupts : IRQ for the temperature alarm
-- #thermal-sensor-cells : Should be 0. See ./thermal.txt for details.
+- #thermal-sensor-cells : Should be 0. See Documentation/devicetree/bindings/thermal/thermal-sensor.yaml for details.
 
 Optional properties:
 - socionext,tmod-calibration: A pair of calibrated values referred from PVT,
