@@ -722,13 +722,12 @@ cur_state_store(struct device *dev, struct device_attribute *attr,
 	return result ? result : count;
 }
 
-static struct device_attribute
-dev_attr_cdev_type = __ATTR(type, 0444, cdev_type_show, NULL);
+static DEVICE_ATTR_RO(type);
 static DEVICE_ATTR_RO(max_state);
 static DEVICE_ATTR_RW(cur_state);
 
 static struct attribute *cooling_device_attrs[] = {
-	&dev_attr_cdev_type.attr,
+	&dev_attr_type.attr,
 	&dev_attr_max_state.attr,
 	&dev_attr_cur_state.attr,
 	NULL,
