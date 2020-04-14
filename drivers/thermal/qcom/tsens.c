@@ -784,11 +784,14 @@ int __init init_common(struct tsens_priv *priv)
 		ret = PTR_ERR(priv->rf[SENSOR_EN]);
 		goto err_put_device;
 	}
-	priv->rf[INT_EN] = devm_regmap_field_alloc(dev, priv->tm_map,
-						   priv->fields[INT_EN]);
-	if (IS_ERR(priv->rf[INT_EN])) {
-		ret = PTR_ERR(priv->rf[INT_EN]);
-		goto err_put_device;
+
+	if (tsens_version(priv) >= VER_0_1) {
+		priv->rf[INT_EN] = devm_regmap_field_alloc(dev, priv->tm_map,
+							   priv->fields[INT_EN]);
+		if (IS_ERR(priv->rf[INT_EN])) {
+			ret = PTR_ERR(priv->rf[INT_EN]);
+			goto err_put_device;
+		}
 	}
 
 	/* This loop might need changes if enum regfield_ids is reordered */
