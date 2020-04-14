@@ -120,6 +120,17 @@
 			#clock-cells = <1>;
 			#reset-cells = <1>;
 			reg = <0x900000 0x4000>;
+
+			tsens: thermal-sensor@903620 {
+			       compatible = "qcom,msm89x0-tsens";
+			       reg = <0x903620 0x100>; /* TM */
+			       nvmem-cells = <&tsens_calib>, <&tsens_backup>;
+			       nvmem-cell-names = "calib", "calib_backup";
+			       #qcom,sensors = <11>;
+			       interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>;
+			       interrupt-names = "uplow";
+			       #thermal-sensor-cells = <1>;
+			};
 		};
 
 		lcc: clock-controller@28000000 {
@@ -325,6 +336,19 @@
 				clocks = <&gcc GSBI1_QUP_CLK>, <&gcc GSBI1_H_CLK>;
 				clock-names = "core", "iface";
 				status = "disabled";
+			};
+		};
+
+		qfprom: qfprom@fa700000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "qcom,qfprom";
+			reg = <0xfc4bc000 0x1000>;
+			tsens_calib: calib@d0 {
+				reg = <0xd0 0x18>;
+			};
+			tsens_backup: backup@440 {
+				reg = <0x440 0x10>;
 			};
 		};
 	};
