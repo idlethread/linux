@@ -281,7 +281,7 @@ static int get_temp_8960(const struct tsens_sensor *s, int *temp)
 	return -ETIMEDOUT;
 }
 
-static const struct tsens_features tsens_8960_feat = {
+static struct tsens_features tsens_8960_feat = {
 	.ver_major	= VER_8960,
 	.crit_int	= 0,
 	.adc		= 1,
@@ -306,8 +306,8 @@ static const struct reg_field tsens_8960_regfields[MAX_REGFIELDS] = {
 	/* Single UPPER/LOWER TEMPERATURE THRESHOLD for all sensors */
 	[LOW_THRESH_0]   = REG_FIELD(THRESHOLD_ADDR,  0,  7),
 	[UP_THRESH_0]    = REG_FIELD(THRESHOLD_ADDR,  8, 15),
-	[MIN_THRESH_0]   = REG_FIELD(THRESHOLD_ADDR, 16, 23),
-	[MAX_THRESH_0]   = REG_FIELD(THRESHOLD_ADDR, 24, 31),
+	//[MIN_THRESH_0]   = REG_FIELD(THRESHOLD_ADDR, 16, 23),
+	//[MAX_THRESH_0]   = REG_FIELD(THRESHOLD_ADDR, 24, 31),
 
 	/* UPPER/LOWER INTERRUPT [CLEAR/STATUS] */
 	/* 1 == clear, 0 == normal operation */
