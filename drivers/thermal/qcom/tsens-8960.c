@@ -282,7 +282,7 @@ static int get_temp_8960(const struct tsens_sensor *s, int *temp)
 }
 
 static struct tsens_features tsens_8960_feat = {
-	.ver_major	= VER_8960,
+	.ver_major	= VER_0,
 	.crit_int	= 0,
 	.adc		= 1,
 	.srot_split	= 0,
