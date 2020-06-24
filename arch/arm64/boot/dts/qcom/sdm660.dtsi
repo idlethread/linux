@@ -6,6 +6,7 @@
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/clock/qcom,gcc-sdm660.h>
+#include <dt-bindings/thermal/thermal.h>
 
 / {
 	interrupt-parent = <&intc>;
@@ -239,6 +240,28 @@
 			#reset-cells = <1>;
 			#power-domain-cells = <1>;
 			reg = <0x00100000 0x94000>;
+		};
+
+		tsens0: thermal-sensor@10ab000 {
+			compatible = "qcom,sdm660-tsens", "qcom,tsens-v2";
+			reg = <0 0x010ab000 0 0x1ff>, /* TM */
+			      <0 0x010aa000 0 0x1ff>; /* SROT */
+			#qcom,sensors = <13>;
+			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 430 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "uplow", "critical";
+			#thermal-sensor-cells = <1>;
+		};
+
+		tsens1: thermal-sensor@10ae000 {
+			compatible = "qcom,sdm660-tsens", "qcom,tsens-v2";
+			reg = <0 0x010ae000 0 0x1ff>, /* TM */
+			      <0 0x010ad000 0 0x1ff>; /* SROT */
+			#qcom,sensors = <8>;
+			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 430 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "uplow", "critical";
+			#thermal-sensor-cells = <1>;
 		};
 
 		tlmm: pinctrl@3100000 {
