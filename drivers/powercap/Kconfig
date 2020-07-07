@@ -43,4 +43,12 @@ config IDLE_INJECT
 	  CPUs for power capping. Idle period can be injected
 	  synchronously on a set of specified CPUs or alternatively
 	  on a per CPU basis.
+
+config POWERCAP_EM
+        bool "Energy model based power capping"
+	depends on ENERGY_MODEL
+	default y
+	help
+	  This enables support for the power capping using the energy
+	  model and the associated per device performance state.
 endif
