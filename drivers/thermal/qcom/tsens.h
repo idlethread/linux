@@ -25,7 +25,8 @@ struct tsens_priv;
 
 /* IP version numbers in ascending order */
 enum tsens_ver {
-	VER_0_1 = 0,
+	VER_0 = 0,
+	VER_0_1,
 	VER_1_X,
 	VER_2_X,
 };
@@ -440,6 +441,10 @@ enum regfield_ids {
 	CRIT_THRESH_13,
 	CRIT_THRESH_14,
 	CRIT_THRESH_15,
+
+	/* VER_0 MIN MAX THRESH */
+	MIN_THRESH_0,
+	MAX_THRESH_0,
 
 	/* WATCHDOG */
 	WDOG_BARK_STATUS,

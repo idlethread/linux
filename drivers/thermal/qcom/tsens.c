@@ -515,6 +515,15 @@ static irqreturn_t tsens_irq_thread(int irq, void *data)
 			dev_dbg(priv->dev, "[%u] %s: no violation:  %d\n",
 				hw_id, __func__, temp);
 		}
+
+		if (tsens_version(priv) < VER_0_1) {
+			/* Constraint: There is only 1 interrupt control register for all
+			 * 11 temperature sensor. So monitoring more than 1 sensor based
+			 * on interrupts will yield inconsistent result. To overcome this
+			 * issue we will monitor only sensor 0 which is the master sensor.
+			 */
+			break;
+		}
 	}
 
 	return IRQ_HANDLED;
@@ -529,6 +538,13 @@ static int tsens_set_trips(void *_sensor, int low, int high)
 	unsigned long flags;
 	int high_val, low_val, cl_high, cl_low;
 	u32 hw_id = s->hw_id;
+
+	if (tsens_version(priv) < VER_0_1) {
+		/* Pre v0.1 IP had a single register for each type of interrupt
+		 * and thresholds
+		 */
+		hw_id = 0;
+	}
 
 	dev_dbg(dev, "[%u] %s: proposed thresholds: (%d:%d)\n",
 		hw_id, __func__, low, high);
@@ -548,6 +564,12 @@ static int tsens_set_trips(void *_sensor, int low, int high)
 	regmap_field_write(priv->rf[UP_THRESH_0 + hw_id], high_val);
 	tsens_set_interrupt(priv, hw_id, LOWER, true);
 	tsens_set_interrupt(priv, hw_id, UPPER, true);
+
+	/* VER_0 require to set MIN and MAX THRESH */
+	if (tsens_version(priv) < VER_0_1) {
+		regmap_field_write(priv->rf[MIN_THRESH_0], 0);
+		regmap_field_write(priv->rf[MAX_THRESH_0], 120000);
+	}
 
 	spin_unlock_irqrestore(&priv->ul_lock, flags);
 
@@ -584,18 +606,21 @@ int get_temp_tsens_valid(const struct tsens_sensor *s, int *temp)
 	u32 valid;
 	int ret;
 
-	ret = regmap_field_read(priv->rf[valid_idx], &valid);
-	if (ret)
-		return ret;
-	while (!valid) {
-		/* Valid bit is 0 for 6 AHB clock cycles.
-		 * At 19.2MHz, 1 AHB clock is ~60ns.
-		 * We should enter this loop very, very rarely.
-		 */
-		ndelay(400);
+	/* VER_0 doesn't have VALID bit */
+	if (tsens_version(priv) >= VER_0_1) {
 		ret = regmap_field_read(priv->rf[valid_idx], &valid);
 		if (ret)
 			return ret;
+		while (!valid) {
+			/* Valid bit is 0 for 6 AHB clock cycles.
+			 * At 19.2MHz, 1 AHB clock is ~60ns.
+			 * We should enter this loop very, very rarely.
+			 */
+			ndelay(400);
+			ret = regmap_field_read(priv->rf[valid_idx], &valid);
+			if (ret)
+				return ret;
+		}
 	}
 
 	/* Valid bit is set, OK to read the temperature */
@@ -753,8 +778,8 @@ int __init init_common(struct tsens_priv *priv)
 
 	if (tsens_version(priv) > VER_0_1) {
 		for (i = VER_MAJOR; i <= VER_STEP; i++) {
-			priv->rf[i] = devm_regmap_field_alloc(dev, priv->srot_map,
-							      priv->fields[i]);
+			priv->rf[i] = devm_regmap_field_alloc(
+				dev, priv->srot_map, priv->fields[i]);
 			if (IS_ERR(priv->rf[i]))
 				return PTR_ERR(priv->rf[i]);
 		}
@@ -763,31 +788,86 @@ int __init init_common(struct tsens_priv *priv)
 			goto err_put_device;
 	}
 
-	priv->rf[TSENS_EN] = devm_regmap_field_alloc(dev, priv->srot_map,
-						     priv->fields[TSENS_EN]);
-	if (IS_ERR(priv->rf[TSENS_EN])) {
-		ret = PTR_ERR(priv->rf[TSENS_EN]);
-		goto err_put_device;
+	if (tsens_version(priv) >= VER_0_1) {
+		priv->rf[TSENS_EN] = devm_regmap_field_alloc(
+			dev, priv->srot_map, priv->fields[TSENS_EN]);
+		if (IS_ERR(priv->rf[TSENS_EN])) {
+			ret = PTR_ERR(priv->rf[TSENS_EN]);
+			goto err_put_device;
+		}
+
+		priv->rf[SENSOR_EN] = devm_regmap_field_alloc(
+			dev, priv->srot_map, priv->fields[SENSOR_EN]);
+		if (IS_ERR(priv->rf[SENSOR_EN])) {
+			ret = PTR_ERR(priv->rf[SENSOR_EN]);
+			goto err_put_device;
+		}
+		priv->rf[INT_EN] = devm_regmap_field_alloc(
+			dev, priv->tm_map, priv->fields[INT_EN]);
+		if (IS_ERR(priv->rf[INT_EN])) {
+			ret = PTR_ERR(priv->rf[INT_EN]);
+			goto err_put_device;
+		}
+	} else {
+		priv->rf[TSENS_EN] = devm_regmap_field_alloc(
+			dev, priv->tm_map, priv->fields[TSENS_EN]);
+		if (IS_ERR(priv->rf[TSENS_EN])) {
+			ret = PTR_ERR(priv->rf[TSENS_EN]);
+			goto err_put_device;
+		}
+
+		priv->rf[TSENS_SW_RST] = devm_regmap_field_alloc(
+			dev, priv->tm_map, priv->fields[TSENS_EN]);
+		if (IS_ERR(priv->rf[TSENS_EN])) {
+			ret = PTR_ERR(priv->rf[TSENS_EN]);
+			goto err_put_device;
+		}
+
+		/* enable TSENS */
+		regmap_field_write(priv->rf[TSENS_EN], 1);
+
+		priv->rf[LOW_INT_CLEAR_0] = devm_regmap_field_alloc(
+			dev, priv->tm_map, priv->fields[LOW_INT_CLEAR_0]);
+		if (IS_ERR(priv->rf[LOW_INT_CLEAR_0])) {
+			ret = PTR_ERR(priv->rf[LOW_INT_CLEAR_0]);
+			goto err_put_device;
+		}
+
+		priv->rf[UP_INT_CLEAR_0] = devm_regmap_field_alloc(
+			dev, priv->tm_map, priv->fields[UP_INT_CLEAR_0]);
+		if (IS_ERR(priv->rf[UP_INT_CLEAR_0])) {
+			ret = PTR_ERR(priv->rf[UP_INT_CLEAR_0]);
+			goto err_put_device;
+		}
+
+		priv->rf[MIN_THRESH_0] = devm_regmap_field_alloc(
+			dev, priv->tm_map, priv->fields[MIN_THRESH_0]);
+		if (IS_ERR(priv->rf[MIN_THRESH_0])) {
+			ret = PTR_ERR(priv->rf[MIN_THRESH_0]);
+			goto err_put_device;
+		}
+
+		priv->rf[MAX_THRESH_0] = devm_regmap_field_alloc(
+			dev, priv->tm_map, priv->fields[MAX_THRESH_0]);
+		if (IS_ERR(priv->rf[MAX_THRESH_0])) {
+			ret = PTR_ERR(priv->rf[MAX_THRESH_0]);
+			goto err_put_device;
+		}
+
+		priv->rf[TRDY] = devm_regmap_field_alloc(dev, priv->tm_map,
+							 priv->fields[TRDY]);
+		if (IS_ERR(priv->rf[TRDY])) {
+			ret = PTR_ERR(priv->rf[TRDY]);
+			goto err_put_device;
+		}
 	}
+
 	ret = regmap_field_read(priv->rf[TSENS_EN], &enabled);
 	if (ret)
 		goto err_put_device;
 	if (!enabled) {
 		dev_err(dev, "%s: device not enabled\n", __func__);
 		ret = -ENODEV;
-		goto err_put_device;
-	}
-
-	priv->rf[SENSOR_EN] = devm_regmap_field_alloc(dev, priv->srot_map,
-						      priv->fields[SENSOR_EN]);
-	if (IS_ERR(priv->rf[SENSOR_EN])) {
-		ret = PTR_ERR(priv->rf[SENSOR_EN]);
-		goto err_put_device;
-	}
-	priv->rf[INT_EN] = devm_regmap_field_alloc(dev, priv->tm_map,
-						   priv->fields[INT_EN]);
-	if (IS_ERR(priv->rf[INT_EN])) {
-		ret = PTR_ERR(priv->rf[INT_EN]);
 		goto err_put_device;
 	}
 
@@ -844,7 +924,11 @@ int __init init_common(struct tsens_priv *priv)
 	}
 
 	spin_lock_init(&priv->ul_lock);
-	tsens_enable_irq(priv);
+
+	/* VER_0 interrupt doesn't need to be enabled */
+	if (tsens_version(priv) >= VER_0_1)
+		tsens_enable_irq(priv);
+
 	tsens_debug_init(op);
 
 err_put_device:
@@ -940,10 +1024,18 @@ static int tsens_register_irq(struct tsens_priv *priv, char *irqname,
 		if (irq == -ENXIO)
 			ret = 0;
 	} else {
-		ret = devm_request_threaded_irq(&pdev->dev, irq,
-						NULL, thread_fn,
-						IRQF_ONESHOT,
-						dev_name(&pdev->dev), priv);
+		/* VER_0 have a different interrupt type */
+		if (tsens_version(priv) > VER_0)
+			ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
+							thread_fn, IRQF_ONESHOT,
+							dev_name(&pdev->dev),
+							priv);
+		else
+			ret = devm_request_threaded_irq(&pdev->dev, irq,
+							thread_fn, NULL,
+							IRQF_TRIGGER_RISING,
+							dev_name(&pdev->dev),
+							priv);
 		if (ret)
 			dev_err(&pdev->dev, "%s: failed to get irq\n",
 				__func__);
