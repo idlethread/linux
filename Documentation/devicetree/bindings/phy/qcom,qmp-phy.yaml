@@ -31,6 +31,8 @@ properties:
       - qcom,sdm845-qmp-usb3-uni-phy
       - qcom,sm8150-qmp-ufs-phy
       - qcom,sm8250-qmp-ufs-phy
+      - qcom,sm8250-qmp-pcie-phy
+      - qcom,sm8250-qhp-pcie-phy
 
   reg:
     items:
@@ -259,6 +261,8 @@ allOf:
             enum:
               - qcom,sdm845-qhp-pcie-phy
               - qcom,sdm845-qmp-pcie-phy
+              - qcom,sm8250-qhp-pcie-phy
+              - qcom,sm8250-qmp-pcie-phy
     then:
       properties:
         clocks:
