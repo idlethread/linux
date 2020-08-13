@@ -139,7 +139,7 @@ static void dsi_pll_setup_config(struct dsi_pll_7nm *pll)
 	config->frac_bits = 18;
 	config->lock_timer = 64;
 	config->ssc_freq = 31500;
-	config->ssc_offset = 5000;
+	config->ssc_offset = 4800;
 	config->ssc_adj_per = 2;
 	config->thresh_cycles = 32;
 	config->refclk_cycles = 256;
@@ -325,7 +325,7 @@ static void dsi_pll_commit(struct dsi_pll_7nm *pll)
 		  reg->frac_div_start_high);
 	pll_write(base + REG_DSI_7nm_PHY_PLL_PLL_LOCKDET_RATE_1, 0x40);
 	pll_write(base + REG_DSI_7nm_PHY_PLL_PLL_LOCK_DELAY, 0x06);
-	pll_write(base + REG_DSI_7nm_PHY_PLL_CMODE, 0x10);
+	pll_write(base + REG_DSI_7nm_PHY_PLL_CMODE_1, 0x10);
 	pll_write(base + REG_DSI_7nm_PHY_PLL_CLOCK_INVERTERS,
 		  reg->pll_clock_inverters);
 }
@@ -518,6 +518,7 @@ static unsigned long dsi_pll_7nm_vco_recalc_rate(struct clk_hw *hw,
 	u64 multiplier;
 	u32 frac;
 	u32 dec;
+	u32 outdiv;
 	u64 pll_freq, tmp64;
 
 	dec = pll_read(base + REG_DSI_7nm_PHY_PLL_DECIMAL_DIV_START_1);
@@ -529,6 +530,8 @@ static unsigned long dsi_pll_7nm_vco_recalc_rate(struct clk_hw *hw,
 	frac |= ((pll_read(base + REG_DSI_7nm_PHY_PLL_FRAC_DIV_START_HIGH_1) &
 		  0x3) << 16);
 
+	outdiv = 1 << (pll_read(base + REG_DSI_7nm_PHY_PLL_PLL_OUTDIV_RATE) & 0x3);
+
 	/*
 	 * TODO:
 	 *	1. Assumes prescaler is disabled
@@ -539,10 +542,10 @@ static unsigned long dsi_pll_7nm_vco_recalc_rate(struct clk_hw *hw,
 	tmp64 = (ref_clk * 2 * frac);
 	pll_freq += div_u64(tmp64, multiplier);
 
-	vco_rate = pll_freq;
+	vco_rate = div_u64(pll_freq, outdiv);
 
-	DBG("DSI PLL%d returning vco rate = %lu, dec = %x, frac = %x",
-	    pll_7nm->id, (unsigned long)vco_rate, dec, frac);
+	DBG("DSI PLL%d returning vco rate = %lu, dec = %x, frac = %x, outdiv = %x",
+	    pll_7nm->id, (unsigned long)vco_rate, dec, frac, outdiv);
 
 	return (unsigned long)vco_rate;
 }
