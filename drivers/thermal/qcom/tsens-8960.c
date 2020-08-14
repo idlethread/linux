@@ -191,7 +191,7 @@ static int calibrate_8960(struct tsens_priv *priv)
 
 	data = qfprom_read(priv->dev, "calib");
 	if (IS_ERR(data))
-		data = qfprom_read(priv->dev, "calib_backup");
+		data = qfprom_read(priv->dev, "calib_sel");
 	if (IS_ERR(data))
 		return PTR_ERR(data);
 
