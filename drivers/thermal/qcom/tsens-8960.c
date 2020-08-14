@@ -67,6 +67,14 @@
 #define S9_STATUS_OFF		0x3674
 #define S10_STATUS_OFF		0x3678
 
+#define TSENS_FACTOR		1
+
+u32 tsens_msm8960_slope[] = {
+			1176, 1176, 1154, 1176,
+			1111, 1132, 1132, 1199,
+			1132, 1199, 1132
+			};
+
 static int suspend_8960(struct tsens_priv *priv)
 {
 	int ret;
@@ -187,8 +195,10 @@ static int calibrate_8960(struct tsens_priv *priv)
 	if (IS_ERR(data))
 		return PTR_ERR(data);
 
-	for (i = 0; i < num_read; i++, s++)
-		s->offset = data[i];
+	for (i = 0; i < num_read; i++, s++) {
+		s->slope = tsens_msm8960_slope[i];
+		s->offset = CAL_MDEGC - (data[i] * s->slope);
+	}
 
 	kfree(data);
 
@@ -198,32 +208,43 @@ static int calibrate_8960(struct tsens_priv *priv)
 /* Temperature on y axis and ADC-code on x-axis */
 static inline int code_to_mdegC(u32 adc_code, const struct tsens_sensor *s)
 {
-	int slope, offset;
+	int num, degc;
 
-	slope = thermal_zone_get_slope(s->tzd);
-	offset = CAL_MDEGC - slope * s->offset;
+	num = (adc_code * s->slope) + s->offset;
 
-	return adc_code * slope + offset;
+	if (num == 0)
+		degc = num;
+	else if (num > 0)
+		degc = (num + TSENS_FACTOR / 2)
+			/ TSENS_FACTOR;
+	else
+		degc = (num - TSENS_FACTOR / 2)
+			/ TSENS_FACTOR;
+
+	return degc;
 }
 
 static int get_temp_8960(const struct tsens_sensor *s, int *temp)
 {
 	int ret;
-	u32 code, trdy;
+	u32 last_temp = 0, trdy;
 	struct tsens_priv *priv = s->priv;
 	unsigned long timeout;
 
 	timeout = jiffies + usecs_to_jiffies(TIMEOUT_US);
 	do {
-		ret = regmap_read(priv->tm_map, INT_STATUS_ADDR, &trdy);
+		ret = regmap_field_read(priv->rf[TRDY], &trdy);
 		if (ret)
 			return ret;
-		if (!(trdy & TRDY_MASK))
+		if (!trdy)
 			continue;
-		ret = regmap_read(priv->tm_map, s->status, &code);
+
+		ret = regmap_field_read(priv->rf[LAST_TEMP_0 + s->hw_id], &last_temp);
 		if (ret)
 			return ret;
-		*temp = code_to_mdegC(code, s);
+
+		*temp = code_to_mdegC(last_temp, s);
+
 		return 0;
 	} while (time_before(jiffies, timeout));
 
