@@ -7,6 +7,8 @@
  */
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#define MICROWATT_PER_MILLIWATT 1000
+
 #include <linux/cpumask.h>
 #include <linux/cpufreq.h>
 #include <linux/cpuhotplug.h>
@@ -131,7 +133,7 @@ static int powercap_em_set_power_range(struct powercap_em *pcem,
 	pcem->power_min *= MICROWATT_PER_MILLIWATT;
 	pcem->power_min *= nr_cpus;
 
-	pcem->power_max = em->table[em->nr_cap_states - 1].power;
+	pcem->power_max = em->table[em->nr_perf_states - 1].power;
 	pcem->power_max *= MICROWATT_PER_MILLIWATT;
 	pcem->power_max *= nr_cpus;
 
@@ -168,7 +170,7 @@ static int get_pd_power_uw(struct powercap_zone *pcz, u64 *power_uw)
 	pd = em_cpu_get(pcem->cpu);
 	nr_cpus = cpumask_weight(to_cpumask(pd->cpus));
 
-	for (i = 0; i < pd->nr_cap_states; i++) {
+	for (i = 0; i < pd->nr_perf_states; i++) {
 
 		if (pd->table[i].frequency < freq)
 			continue;
@@ -221,7 +223,7 @@ static int set_domain_enable(struct powercap_zone *pcz, bool mode)
 
 		ret = freq_qos_add_request(&policy->constraints,
 					   &pcem->qos_req, FREQ_QOS_MAX,
-					   pd->table[pd->nr_cap_states - 1].frequency);
+					   pd->table[pd->nr_perf_states - 1].frequency);
 		if (ret)
 			return ret;
 
@@ -339,7 +341,7 @@ static int set_pd_power_limit(struct powercap_zone *pcz, int cid,
 
 	nr_cpus = cpumask_weight(to_cpumask(pd->cpus));
 
-	for (i = 0, frequency = pd->table[0].frequency; i < pd->nr_cap_states; i++) {
+	for (i = 0, frequency = pd->table[0].frequency; i < pd->nr_perf_states; i++) {
 
 		u64 power = pd->table[i].power * MICROWATT_PER_MILLIWATT;
 
@@ -453,7 +455,7 @@ static int cpuhp_powercap_em_online(unsigned int cpu)
 
 	ret = freq_qos_add_request(&policy->constraints,
 				   &pcem->qos_req, FREQ_QOS_MAX,
-				   pd->table[pd->nr_cap_states - 1].frequency);
+				   pd->table[pd->nr_perf_states - 1].frequency);
 
 	powercap_em_rebalance_weight(pc_soc);
 
