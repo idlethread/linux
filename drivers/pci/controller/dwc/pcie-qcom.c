@@ -57,6 +57,7 @@
 #define PCIE20_PARF_SID_OFFSET			0x234
 #define PCIE20_PARF_BDF_TRANSLATE_CFG		0x24C
 #define PCIE20_PARF_DEVICE_TYPE			0x1000
+#define PCIE20_PARF_BDF_TO_SID_TABLE_N		0x2000
 
 #define PCIE20_ELBI_SYS_CTRL			0x04
 #define PCIE20_ELBI_SYS_CTRL_LT_ENABLE		BIT(0)
@@ -1289,6 +1290,9 @@ static int qcom_pcie_host_init(struct pcie_port *pp)
 	ret = qcom_pcie_establish_link(pcie);
 	if (ret)
 		goto err;
+
+	writel(0x0, pcie->parf + PCIE20_PARF_BDF_TO_SID_TABLE_N);
+	writel(0x01000100, pcie->parf + PCIE20_PARF_BDF_TO_SID_TABLE_N + 0x054);
 
 	return 0;
 err:
