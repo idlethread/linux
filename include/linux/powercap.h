@@ -20,6 +20,9 @@ struct powercap_control_type;
 struct powercap_zone;
 struct powercap_zone_constraint;
 
+extern struct list_head gpd_list;
+extern struct mutex gpd_list_lock;
+
 /**
  * struct powercap_control_type_ops - Define control type callbacks
  * @set_enable:		Enable/Disable whole control type.

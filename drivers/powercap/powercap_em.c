@@ -18,6 +18,7 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/pm_domain.h>
 #include <linux/pm_qos.h>
 #include <linux/powercap.h>
 #include <linux/slab.h>
@@ -464,6 +465,9 @@ static int cpuhp_powercap_em_online(unsigned int cpu)
 
 static int __init powercap_em_init(void)
 {
+	struct generic_pm_domain *genpd;
+	struct powercap_em *pc_dev;
+
 	pct = powercap_register_control_type(NULL, "energy_model", NULL);
 	if (!pct) {
 		pr_err("Failed to register control type\n");
@@ -479,6 +483,21 @@ static int __init powercap_em_init(void)
 					  &zone_ops, 1, &constraint_ops);
 	if (!pc_package)
 		return -EINVAL;
+
+	mutex_lock(&gpd_list_lock);
+
+	list_for_each_entry(genpd, &gpd_list, gpd_list_node) {
+		dev_err(&genpd->dev, "registering powercap em zone");
+		pc_dev = powercap_em_register(pct, dev_name(&genpd->dev), NULL,
+					      &zone_ops, 1, &constraint_ops);
+
+		if (!pc_dev) {
+			dev_err(&genpd->dev, "error registering powercap em zone");
+		}
+	}
+
+	mutex_unlock(&gpd_list_lock);
+
 
 	return cpuhp_setup_state(CPUHP_AP_POWERCAP_EM_ONLINE,
 				 "powercap_em:online",

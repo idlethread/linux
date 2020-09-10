@@ -38,8 +38,8 @@
 	__ret;							\
 })
 
-static LIST_HEAD(gpd_list);
-static DEFINE_MUTEX(gpd_list_lock);
+LIST_HEAD(gpd_list);
+DEFINE_MUTEX(gpd_list_lock);
 
 struct genpd_lock_ops {
 	void (*lock)(struct generic_pm_domain *genpd);
