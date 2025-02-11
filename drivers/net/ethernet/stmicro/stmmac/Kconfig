@@ -228,6 +228,16 @@ config DWMAC_SUN8I
 	  stmmac device driver. This driver is used for H3/A83T/A64
 	  EMAC ethernet controller.
 
+config DWMAC_TOSHIBA
+	tristate "Toshiba TC956x support"
+	default ARCH_QCOM
+	depends on OF && STMMAC_ETH && PCI && (ARCH_QCOM || COMPILE_TEST)
+	depends on COMMON_CLK
+	select MFD_SYSCON
+	help
+	  This selects the Toshiba platform specific bus support for the
+	  stmmac driver. This driver is used for Qualcomm FIXME.
+
 config DWMAC_THEAD
 	tristate "T-HEAD dwmac support"
 	depends on OF && (ARCH_THEAD || COMPILE_TEST)
