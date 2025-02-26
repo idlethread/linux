@@ -1,10 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright (c) 2020, Intel Corporation
- * DWMAC Intel header file
+/* Copyright (c) 2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
-#ifndef __DWMAC_INTEL_H__
-#define __DWMAC_INTEL_H__
+#ifndef __DWMAC_TOSHIBA_H__
+#define __DWMAC_TOSHIBA_H__
 
 #define POLL_DELAY_US 8
 
@@ -34,8 +33,8 @@
 #define SERDES_RATE_PCIE_SHIFT	8
 #define SERDES_PCLK_SHIFT	12
 
-#define INTEL_MGBE_ADHOC_ADDR	0x15
-#define INTEL_MGBE_XPCS_ADDR	0x16
+#define TOSHIBA_MGBE_ADHOC_ADDR	0x15
+#define TOSHIBA_MGBE_XPCS_ADDR	0x16
 
 /* Cross-timestamping defines */
 #define ART_CPUID_LEAF		0x15
@@ -50,4 +49,4 @@
 #define PCH_PTP_CLK_FREQ_19_2MHZ	(GMAC_GPO0)
 #define PCH_PTP_CLK_FREQ_200MHZ		(0)
 
-#endif /* __DWMAC_INTEL_H__ */
+#endif /* __DWMAC_TOSHIBA_H__ */

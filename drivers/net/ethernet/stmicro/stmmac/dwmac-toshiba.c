@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright (c) 2020, Intel Corporation
+/* Copyright (c) 2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk-provider.h>
 #include <linux/pci.h>
 #include <linux/dmi.h>
-#include "dwmac-intel.h"
+#include "dwmac-toshiba.h"
 #include "dwmac4.h"
 #include "stmmac.h"
 #include "stmmac_ptp.h"
 
-struct intel_priv_data {
+struct toshiba_priv_data {
 	int mdio_adhoc_addr;	/* mdio address for serdes & etc */
 	unsigned long crossts_adj;
 	bool is_pse;
@@ -74,17 +74,17 @@ static int serdes_status_poll(struct stmmac_priv *priv, int phyaddr,
 	return -ETIMEDOUT;
 }
 
-static int intel_serdes_powerup(struct net_device *ndev, void *priv_data)
+static int tc956x_serdes_powerup(struct net_device *ndev, void *priv_data)
 {
-	struct intel_priv_data *intel_priv = priv_data;
+	struct tc956x_priv_data *tc956x_priv = priv_data;
 	struct stmmac_priv *priv = netdev_priv(ndev);
 	int serdes_phy_addr = 0;
 	u32 data = 0;
 
-	if (!intel_priv->mdio_adhoc_addr)
+	if (!tc956x_priv->mdio_adhoc_addr)
 		return 0;
 
-	serdes_phy_addr = intel_priv->mdio_adhoc_addr;
+	serdes_phy_addr = tc956x_priv->mdio_adhoc_addr;
 
 	/* Set the serdes rate and the PCLK rate */
 	data = mdiobus_read(priv->mii, serdes_phy_addr,
@@ -154,27 +154,27 @@ static int intel_serdes_powerup(struct net_device *ndev, void *priv_data)
 	}
 
 	/* PSE only - ungate SGMII PHY Rx Clock */
-	if (intel_priv->is_pse)
+	if (tc956x_priv->is_pse)
 		mdiobus_modify(priv->mii, serdes_phy_addr, SERDES_GCR0,
 			       0, SERDES_PHY_RX_CLK);
 
 	return 0;
 }
 
-static void intel_serdes_powerdown(struct net_device *ndev, void *intel_data)
+static void tc956x_serdes_powerdown(struct net_device *ndev, void *tc956x_data)
 {
-	struct intel_priv_data *intel_priv = intel_data;
+	struct tc956x_priv_data *tc956x_priv = tc956x_data;
 	struct stmmac_priv *priv = netdev_priv(ndev);
 	int serdes_phy_addr = 0;
 	u32 data = 0;
 
-	if (!intel_priv->mdio_adhoc_addr)
+	if (!tc956x_priv->mdio_adhoc_addr)
 		return;
 
-	serdes_phy_addr = intel_priv->mdio_adhoc_addr;
+	serdes_phy_addr = tc956x_priv->mdio_adhoc_addr;
 
 	/* PSE only - gate SGMII PHY Rx Clock */
-	if (intel_priv->is_pse)
+	if (tc956x_priv->is_pse)
 		mdiobus_modify(priv->mii, serdes_phy_addr, SERDES_GCR0,
 			       SERDES_PHY_RX_CLK, 0);
 
@@ -230,14 +230,14 @@ static void intel_serdes_powerdown(struct net_device *ndev, void *intel_data)
 	}
 }
 
-static void intel_speed_mode_2500(struct net_device *ndev, void *intel_data)
+static void tc956x_speed_mode_2500(struct net_device *ndev, void *tc956x_data)
 {
-	struct intel_priv_data *intel_priv = intel_data;
+	struct tc956x_priv_data *tc956x_priv = tc956x_data;
 	struct stmmac_priv *priv = netdev_priv(ndev);
 	int serdes_phy_addr = 0;
 	u32 data = 0;
 
-	serdes_phy_addr = intel_priv->mdio_adhoc_addr;
+	serdes_phy_addr = tc956x_priv->mdio_adhoc_addr;
 
 	/* Determine the link speed mode: 2.5Gbps/1Gbps */
 	data = mdiobus_read(priv->mii, serdes_phy_addr,
@@ -255,18 +255,18 @@ static void intel_speed_mode_2500(struct net_device *ndev, void *intel_data)
 }
 
 /* Program PTP Clock Frequency for different variant of
- * Intel mGBE that has slightly different GPO mapping
+ * Tc956x mGBE that has slightly different GPO mapping
  */
-static void intel_mgbe_ptp_clk_freq_config(struct stmmac_priv *priv)
+static void tc956x_mgbe_ptp_clk_freq_config(struct stmmac_priv *priv)
 {
-	struct intel_priv_data *intel_priv;
+	struct tc956x_priv_data *tc956x_priv;
 	u32 gpio_value;
 
-	intel_priv = (struct intel_priv_data *)priv->plat->bsp_priv;
+	tc956x_priv = (struct tc956x_priv_data *)priv->plat->bsp_priv;
 
 	gpio_value = readl(priv->ioaddr + GMAC_GPIO_STATUS);
 
-	if (intel_priv->is_pse) {
+	if (tc956x_priv->is_pse) {
 		/* For PSE GbE, use 200MHz */
 		gpio_value &= ~PSE_PTP_CLK_FREQ_MASK;
 		gpio_value |= PSE_PTP_CLK_FREQ_200MHZ;
@@ -279,18 +279,18 @@ static void intel_mgbe_ptp_clk_freq_config(struct stmmac_priv *priv)
 	writel(gpio_value, priv->ioaddr + GMAC_GPIO_STATUS);
 }
 
-static void get_arttime(struct mii_bus *mii, int intel_adhoc_addr,
+static void get_arttime(struct mii_bus *mii, int tc956x_adhoc_addr,
 			u64 *art_time)
 {
 	u64 ns;
 
-	ns = mdiobus_read(mii, intel_adhoc_addr, PMC_ART_VALUE3);
+	ns = mdiobus_read(mii, tc956x_adhoc_addr, PMC_ART_VALUE3);
 	ns <<= GMAC4_ART_TIME_SHIFT;
-	ns |= mdiobus_read(mii, intel_adhoc_addr, PMC_ART_VALUE2);
+	ns |= mdiobus_read(mii, tc956x_adhoc_addr, PMC_ART_VALUE2);
 	ns <<= GMAC4_ART_TIME_SHIFT;
-	ns |= mdiobus_read(mii, intel_adhoc_addr, PMC_ART_VALUE1);
+	ns |= mdiobus_read(mii, tc956x_adhoc_addr, PMC_ART_VALUE1);
 	ns <<= GMAC4_ART_TIME_SHIFT;
-	ns |= mdiobus_read(mii, intel_adhoc_addr, PMC_ART_VALUE0);
+	ns |= mdiobus_read(mii, tc956x_adhoc_addr, PMC_ART_VALUE0);
 
 	*art_time = ns;
 }
@@ -300,11 +300,11 @@ static int stmmac_cross_ts_isr(struct stmmac_priv *priv)
 	return (readl(priv->ioaddr + GMAC_INT_STATUS) & GMAC_INT_TSIE);
 }
 
-static int intel_crosststamp(ktime_t *device,
+static int tc956x_crosststamp(ktime_t *device,
 			     struct system_counterval_t *system,
 			     void *ctx)
 {
-	struct intel_priv_data *intel_priv;
+	struct tc956x_priv_data *tc956x_priv;
 
 	struct stmmac_priv *priv = (struct stmmac_priv *)ctx;
 	void __iomem *ptpaddr = priv->ptpaddr;
@@ -320,7 +320,7 @@ static int intel_crosststamp(ktime_t *device,
 	if (!boot_cpu_has(X86_FEATURE_ART))
 		return -EOPNOTSUPP;
 
-	intel_priv = priv->plat->bsp_priv;
+	tc956x_priv = priv->plat->bsp_priv;
 
 	/* Both internal crosstimestamping and external triggered event
 	 * timestamping cannot be run concurrently.
@@ -389,18 +389,18 @@ static int intel_crosststamp(ktime_t *device,
 		stmmac_get_ptptime(priv, ptpaddr, &ptp_time);
 		*device = ns_to_ktime(ptp_time);
 		read_unlock_irqrestore(&priv->ptp_lock, flags);
-		get_arttime(priv->mii, intel_priv->mdio_adhoc_addr, &art_time);
+		get_arttime(priv->mii, tc956x_priv->mdio_adhoc_addr, &art_time);
 		system->cycles = art_time;
 	}
 
-	system->cycles *= intel_priv->crossts_adj;
+	system->cycles *= tc956x_priv->crossts_adj;
 	system->cs_id = CSID_X86_ART;
 	priv->plat->flags &= ~STMMAC_FLAG_INT_SNAPSHOT_EN;
 
 	return 0;
 }
 
-static void intel_mgbe_pse_crossts_adj(struct intel_priv_data *intel_priv,
+static void tc956x_mgbe_pse_crossts_adj(struct tc956x_priv_data *tc956x_priv,
 				       int base)
 {
 	if (boot_cpu_has(X86_FEATURE_ART)) {
@@ -411,7 +411,7 @@ static void intel_mgbe_pse_crossts_adj(struct intel_priv_data *intel_priv,
 		 */
 		art_freq = cpuid_ecx(ART_CPUID_LEAF);
 		do_div(art_freq, base);
-		intel_priv->crossts_adj = art_freq;
+		tc956x_priv->crossts_adj = art_freq;
 	}
 }
 
@@ -444,7 +444,7 @@ static void common_default_data(struct plat_stmmacenet_data *plat)
 	plat->rx_queues_cfg[0].pkt_route = 0x0;
 }
 
-static struct phylink_pcs *intel_mgbe_select_pcs(struct stmmac_priv *priv,
+static struct phylink_pcs *tc956x_mgbe_select_pcs(struct stmmac_priv *priv,
 						 phy_interface_t interface)
 {
 	/* plat->mdio_bus_data->has_xpcs has been set true, so there
@@ -454,7 +454,7 @@ static struct phylink_pcs *intel_mgbe_select_pcs(struct stmmac_priv *priv,
 	return xpcs_to_phylink_pcs(priv->hw->xpcs);
 }
 
-static int intel_mgbe_common_data(struct pci_dev *pdev,
+static int tc956x_mgbe_common_data(struct pci_dev *pdev,
 				  struct plat_stmmacenet_data *plat)
 {
 	struct fwnode_handle *fwnode;
@@ -559,7 +559,7 @@ static int intel_mgbe_common_data(struct pci_dev *pdev,
 		return ret;
 	}
 
-	plat->ptp_clk_freq_config = intel_mgbe_ptp_clk_freq_config;
+	plat->ptp_clk_freq_config = tc956x_mgbe_ptp_clk_freq_config;
 
 	/* Set default value for multicast hash bins */
 	plat->multicast_filter_bins = HASH_TABLE_SIZE;
@@ -593,24 +593,24 @@ static int intel_mgbe_common_data(struct pci_dev *pdev,
 		}
 	}
 
-	/* Intel mgbe SGMII interface uses pcs-xcps */
+	/* Tc956x mgbe SGMII interface uses pcs-xcps */
 	if (plat->phy_interface == PHY_INTERFACE_MODE_SGMII ||
 	    plat->phy_interface == PHY_INTERFACE_MODE_1000BASEX) {
-		plat->mdio_bus_data->pcs_mask = BIT(INTEL_MGBE_XPCS_ADDR);
+		plat->mdio_bus_data->pcs_mask = BIT(TC956X_MGBE_XPCS_ADDR);
 		plat->mdio_bus_data->default_an_inband = true;
-		plat->select_pcs = intel_mgbe_select_pcs;
+		plat->select_pcs = tc956x_mgbe_select_pcs;
 	}
 
-	/* Ensure mdio bus scan skips intel serdes and pcs-xpcs */
-	plat->mdio_bus_data->phy_mask = 1 << INTEL_MGBE_ADHOC_ADDR;
-	plat->mdio_bus_data->phy_mask |= 1 << INTEL_MGBE_XPCS_ADDR;
+	/* Ensure mdio bus scan skips tc956x serdes and pcs-xpcs */
+	plat->mdio_bus_data->phy_mask = 1 << TC956X_MGBE_ADHOC_ADDR;
+	plat->mdio_bus_data->phy_mask |= 1 << TC956X_MGBE_XPCS_ADDR;
 
 	plat->int_snapshot_num = AUX_SNAPSHOT1;
 
-	plat->crosststamp = intel_crosststamp;
+	plat->crosststamp = tc956x_crosststamp;
 	plat->flags &= ~STMMAC_FLAG_INT_SNAPSHOT_EN;
 
-	/* Setup MSI vector offset specific to Intel mGbE controller */
+	/* Setup MSI vector offset specific to Tc956x mGbE controller */
 	plat->msi_mac_vec = 29;
 	plat->msi_lpi_vec = 28;
 	plat->msi_sfty_ce_vec = 27;
@@ -639,76 +639,32 @@ static int ehl_common_data(struct pci_dev *pdev,
 	plat->safety_feat_cfg->prtyen = 0;
 	plat->safety_feat_cfg->tmouten = 0;
 
-	return intel_mgbe_common_data(pdev, plat);
+	return tc956x_mgbe_common_data(pdev, plat);
 }
-
-static int ehl_sgmii_data(struct pci_dev *pdev,
-			  struct plat_stmmacenet_data *plat)
-{
-	plat->bus_id = 1;
-	plat->phy_interface = PHY_INTERFACE_MODE_SGMII;
-	plat->speed_mode_2500 = intel_speed_mode_2500;
-	plat->serdes_powerup = intel_serdes_powerup;
-	plat->serdes_powerdown = intel_serdes_powerdown;
-
-	plat->clk_ptp_rate = 204800000;
-
-	return ehl_common_data(pdev, plat);
-}
-
-static struct stmmac_pci_info ehl_sgmii1g_info = {
-	.setup = ehl_sgmii_data,
-};
-
-static int ehl_rgmii_data(struct pci_dev *pdev,
-			  struct plat_stmmacenet_data *plat)
-{
-	plat->bus_id = 1;
-	plat->phy_interface = PHY_INTERFACE_MODE_RGMII;
-
-	plat->clk_ptp_rate = 204800000;
-
-	return ehl_common_data(pdev, plat);
-}
-
-static struct stmmac_pci_info ehl_rgmii1g_info = {
-	.setup = ehl_rgmii_data,
-};
 
 static int ehl_pse0_common_data(struct pci_dev *pdev,
 				struct plat_stmmacenet_data *plat)
 {
-	struct intel_priv_data *intel_priv = plat->bsp_priv;
+	struct tc956x_priv_data *tc956x_priv = plat->bsp_priv;
 
-	intel_priv->is_pse = true;
+	tc956x_priv->is_pse = true;
 	plat->bus_id = 2;
 	plat->host_dma_width = 32;
 
 	plat->clk_ptp_rate = 200000000;
 
-	intel_mgbe_pse_crossts_adj(intel_priv, EHL_PSE_ART_MHZ);
+	tc956x_mgbe_pse_crossts_adj(tc956x_priv, EHL_PSE_ART_MHZ);
 
 	return ehl_common_data(pdev, plat);
 }
-
-static int ehl_pse0_rgmii1g_data(struct pci_dev *pdev,
-				 struct plat_stmmacenet_data *plat)
-{
-	plat->phy_interface = PHY_INTERFACE_MODE_RGMII_ID;
-	return ehl_pse0_common_data(pdev, plat);
-}
-
-static struct stmmac_pci_info ehl_pse0_rgmii1g_info = {
-	.setup = ehl_pse0_rgmii1g_data,
-};
 
 static int ehl_pse0_sgmii1g_data(struct pci_dev *pdev,
 				 struct plat_stmmacenet_data *plat)
 {
 	plat->phy_interface = PHY_INTERFACE_MODE_SGMII;
-	plat->speed_mode_2500 = intel_speed_mode_2500;
-	plat->serdes_powerup = intel_serdes_powerup;
-	plat->serdes_powerdown = intel_serdes_powerdown;
+	plat->speed_mode_2500 = tc956x_speed_mode_2500;
+	plat->serdes_powerup = tc956x_serdes_powerup;
+	plat->serdes_powerdown = tc956x_serdes_powerdown;
 	return ehl_pse0_common_data(pdev, plat);
 }
 
@@ -719,43 +675,18 @@ static struct stmmac_pci_info ehl_pse0_sgmii1g_info = {
 static int ehl_pse1_common_data(struct pci_dev *pdev,
 				struct plat_stmmacenet_data *plat)
 {
-	struct intel_priv_data *intel_priv = plat->bsp_priv;
+	struct tc956x_priv_data *tc956x_priv = plat->bsp_priv;
 
-	intel_priv->is_pse = true;
+	tc956x_priv->is_pse = true;
 	plat->bus_id = 3;
 	plat->host_dma_width = 32;
 
 	plat->clk_ptp_rate = 200000000;
 
-	intel_mgbe_pse_crossts_adj(intel_priv, EHL_PSE_ART_MHZ);
+	tc956x_mgbe_pse_crossts_adj(tc956x_priv, EHL_PSE_ART_MHZ);
 
 	return ehl_common_data(pdev, plat);
 }
-
-static int ehl_pse1_rgmii1g_data(struct pci_dev *pdev,
-				 struct plat_stmmacenet_data *plat)
-{
-	plat->phy_interface = PHY_INTERFACE_MODE_RGMII_ID;
-	return ehl_pse1_common_data(pdev, plat);
-}
-
-static struct stmmac_pci_info ehl_pse1_rgmii1g_info = {
-	.setup = ehl_pse1_rgmii1g_data,
-};
-
-static int ehl_pse1_sgmii1g_data(struct pci_dev *pdev,
-				 struct plat_stmmacenet_data *plat)
-{
-	plat->phy_interface = PHY_INTERFACE_MODE_SGMII;
-	plat->speed_mode_2500 = intel_speed_mode_2500;
-	plat->serdes_powerup = intel_serdes_powerup;
-	plat->serdes_powerdown = intel_serdes_powerdown;
-	return ehl_pse1_common_data(pdev, plat);
-}
-
-static struct stmmac_pci_info ehl_pse1_sgmii1g_info = {
-	.setup = ehl_pse1_sgmii1g_data,
-};
 
 static int tgl_common_data(struct pci_dev *pdev,
 			   struct plat_stmmacenet_data *plat)
@@ -763,7 +694,7 @@ static int tgl_common_data(struct pci_dev *pdev,
 	plat->rx_queues_to_use = 6;
 	plat->tx_queues_to_use = 4;
 	plat->clk_ptp_rate = 204800000;
-	plat->speed_mode_2500 = intel_speed_mode_2500;
+	plat->speed_mode_2500 = tc956x_speed_mode_2500;
 
 	plat->safety_feat_cfg->tsoee = 1;
 	plat->safety_feat_cfg->mrxpee = 0;
@@ -775,79 +706,24 @@ static int tgl_common_data(struct pci_dev *pdev,
 	plat->safety_feat_cfg->prtyen = 0;
 	plat->safety_feat_cfg->tmouten = 0;
 
-	return intel_mgbe_common_data(pdev, plat);
+	return tc956x_mgbe_common_data(pdev, plat);
 }
 
-static int tgl_sgmii_phy0_data(struct pci_dev *pdev,
+static int tc956x_xgmac3_phy0_data(struct pci_dev *pdev,
 			       struct plat_stmmacenet_data *plat)
 {
 	plat->bus_id = 1;
 	plat->phy_interface = PHY_INTERFACE_MODE_SGMII;
-	plat->serdes_powerup = intel_serdes_powerup;
-	plat->serdes_powerdown = intel_serdes_powerdown;
+	plat->serdes_powerup = tc956x_serdes_powerup;
+	plat->serdes_powerdown = tc956x_serdes_powerdown;
 	return tgl_common_data(pdev, plat);
 }
 
-static struct stmmac_pci_info tgl_sgmii1g_phy0_info = {
-	.setup = tgl_sgmii_phy0_data,
+static struct stmmac_pci_info tc956x_xgmac3_pci_info = {
+	.setup = tc956x_xgmac3_phy0_data,
 };
 
-static int tgl_sgmii_phy1_data(struct pci_dev *pdev,
-			       struct plat_stmmacenet_data *plat)
-{
-	plat->bus_id = 2;
-	plat->phy_interface = PHY_INTERFACE_MODE_SGMII;
-	plat->serdes_powerup = intel_serdes_powerup;
-	plat->serdes_powerdown = intel_serdes_powerdown;
-	return tgl_common_data(pdev, plat);
-}
-
-static struct stmmac_pci_info tgl_sgmii1g_phy1_info = {
-	.setup = tgl_sgmii_phy1_data,
-};
-
-static int adls_sgmii_phy0_data(struct pci_dev *pdev,
-				struct plat_stmmacenet_data *plat)
-{
-	plat->bus_id = 1;
-	plat->phy_interface = PHY_INTERFACE_MODE_SGMII;
-
-	/* SerDes power up and power down are done in BIOS for ADL */
-
-	return tgl_common_data(pdev, plat);
-}
-
-static struct stmmac_pci_info adls_sgmii1g_phy0_info = {
-	.setup = adls_sgmii_phy0_data,
-};
-
-static int adls_sgmii_phy1_data(struct pci_dev *pdev,
-				struct plat_stmmacenet_data *plat)
-{
-	plat->bus_id = 2;
-	plat->phy_interface = PHY_INTERFACE_MODE_SGMII;
-
-	/* SerDes power up and power down are done in BIOS for ADL */
-
-	return tgl_common_data(pdev, plat);
-}
-
-static struct stmmac_pci_info adls_sgmii1g_phy1_info = {
-	.setup = adls_sgmii_phy1_data,
-};
-static const struct stmmac_pci_func_data galileo_stmmac_func_data[] = {
-	{
-		.func = 6,
-		.phy_addr = 1,
-	},
-};
-
-static const struct stmmac_pci_dmi_data galileo_stmmac_dmi_data = {
-	.func = galileo_stmmac_func_data,
-	.nfuncs = ARRAY_SIZE(galileo_stmmac_func_data),
-};
-
-static const struct stmmac_pci_func_data iot2040_stmmac_func_data[] = {
+static const struct stmmac_pci_func_data tc956x_stmmac_func_data[] = {
 	{
 		.func = 6,
 		.phy_addr = 1,
@@ -858,84 +734,9 @@ static const struct stmmac_pci_func_data iot2040_stmmac_func_data[] = {
 	},
 };
 
-static const struct stmmac_pci_dmi_data iot2040_stmmac_dmi_data = {
-	.func = iot2040_stmmac_func_data,
-	.nfuncs = ARRAY_SIZE(iot2040_stmmac_func_data),
-};
-
-static const struct dmi_system_id quark_pci_dmi[] = {
-	{
-		.matches = {
-			DMI_EXACT_MATCH(DMI_BOARD_NAME, "Galileo"),
-		},
-		.driver_data = (void *)&galileo_stmmac_dmi_data,
-	},
-	{
-		.matches = {
-			DMI_EXACT_MATCH(DMI_BOARD_NAME, "GalileoGen2"),
-		},
-		.driver_data = (void *)&galileo_stmmac_dmi_data,
-	},
-	/* There are 2 types of SIMATIC IOT2000: IOT2020 and IOT2040.
-	 * The asset tag "6ES7647-0AA00-0YA2" is only for IOT2020 which
-	 * has only one pci network device while other asset tags are
-	 * for IOT2040 which has two.
-	 */
-	{
-		.matches = {
-			DMI_EXACT_MATCH(DMI_BOARD_NAME, "SIMATIC IOT2000"),
-			DMI_EXACT_MATCH(DMI_BOARD_ASSET_TAG,
-					"6ES7647-0AA00-0YA2"),
-		},
-		.driver_data = (void *)&galileo_stmmac_dmi_data,
-	},
-	{
-		.matches = {
-			DMI_EXACT_MATCH(DMI_BOARD_NAME, "SIMATIC IOT2000"),
-		},
-		.driver_data = (void *)&iot2040_stmmac_dmi_data,
-	},
-	{}
-};
-
-static int quark_default_data(struct pci_dev *pdev,
-			      struct plat_stmmacenet_data *plat)
-{
-	int ret;
-
-	/* Set common default data first */
-	common_default_data(plat);
-
-	/* Refuse to load the driver and register net device if MAC controller
-	 * does not connect to any PHY interface.
-	 */
-	ret = stmmac_pci_find_phy_addr(pdev, quark_pci_dmi);
-	if (ret < 0) {
-		/* Return error to the caller on DMI enabled boards. */
-		if (dmi_get_system_info(DMI_BOARD_NAME))
-			return ret;
-
-		/* Galileo boards with old firmware don't support DMI. We always
-		 * use 1 here as PHY address, so at least the first found MAC
-		 * controller would be probed.
-		 */
-		ret = 1;
-	}
-
-	plat->bus_id = pci_dev_id(pdev);
-	plat->phy_addr = ret;
-	plat->phy_interface = PHY_INTERFACE_MODE_RMII;
-
-	plat->dma_cfg->pbl = 16;
-	plat->dma_cfg->pblx8 = true;
-	plat->dma_cfg->fixed_burst = 1;
-	/* AXI (TODO) */
-
-	return 0;
-}
-
-static const struct stmmac_pci_info quark_info = {
-	.setup = quark_default_data,
+static const struct stmmac_pci_dmi_data tc956x_stmmac_dmi_data = {
+	.func = tc956x_stmmac_func_data,
+	.nfuncs = ARRAY_SIZE(tc956x_stmmac_func_data),
 };
 
 static int stmmac_config_single_msi(struct pci_dev *pdev,
@@ -1012,7 +813,7 @@ static int stmmac_config_multi_msi(struct pci_dev *pdev,
 }
 
 /**
- * intel_eth_pci_probe
+ * tc956x_eth_pci_probe
  *
  * @pdev: pci device pointer
  * @id: pointer to table of device id/id's.
@@ -1023,17 +824,17 @@ static int stmmac_config_multi_msi(struct pci_dev *pdev,
  * matches the device. The probe functions returns zero when the driver choose
  * to take "ownership" of the device or an error code(-ve no) otherwise.
  */
-static int intel_eth_pci_probe(struct pci_dev *pdev,
-			       const struct pci_device_id *id)
+static int tc956x_eth_pci_probe(struct pci_dev *pdev,
+				const struct pci_device_id *id)
 {
 	struct stmmac_pci_info *info = (struct stmmac_pci_info *)id->driver_data;
-	struct intel_priv_data *intel_priv;
+	struct tc956x_priv_data *tc956x_priv;
 	struct plat_stmmacenet_data *plat;
 	struct stmmac_resources res;
 	int ret;
 
-	intel_priv = devm_kzalloc(&pdev->dev, sizeof(*intel_priv), GFP_KERNEL);
-	if (!intel_priv)
+	tc956x_priv = devm_kzalloc(&pdev->dev, sizeof(*tc956x_priv), GFP_KERNEL);
+	if (!tc956x_priv)
 		return -ENOMEM;
 
 	plat = devm_kzalloc(&pdev->dev, sizeof(*plat), GFP_KERNEL);
@@ -1071,9 +872,9 @@ static int intel_eth_pci_probe(struct pci_dev *pdev,
 
 	pci_set_master(pdev);
 
-	plat->bsp_priv = intel_priv;
-	intel_priv->mdio_adhoc_addr = INTEL_MGBE_ADHOC_ADDR;
-	intel_priv->crossts_adj = 1;
+	plat->bsp_priv = tc956x_priv;
+	tc956x_priv->mdio_adhoc_addr = TC956X_MGBE_ADHOC_ADDR;
+	tc956x_priv->crossts_adj = 1;
 
 	/* Initialize all MSI vectors to invalid so that it can be set
 	 * according to platform data settings below.
@@ -1125,13 +926,13 @@ err_alloc_irq:
 }
 
 /**
- * intel_eth_pci_remove
+ * tc956x_eth_pci_remove
  *
  * @pdev: pci device pointer
  * Description: this function calls the main to free the net resources
  * and releases the PCI resources.
  */
-static void intel_eth_pci_remove(struct pci_dev *pdev)
+static void tc956x_eth_pci_remove(struct pci_dev *pdev)
 {
 	struct net_device *ndev = dev_get_drvdata(&pdev->dev);
 	struct stmmac_priv *priv = netdev_priv(ndev);
@@ -1142,7 +943,7 @@ static void intel_eth_pci_remove(struct pci_dev *pdev)
 	clk_unregister_fixed_rate(priv->plat->stmmac_clk);
 }
 
-static int __maybe_unused intel_eth_pci_suspend(struct device *dev)
+static int __maybe_unused tc956x_eth_pci_suspend(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	int ret;
@@ -1160,7 +961,7 @@ static int __maybe_unused intel_eth_pci_suspend(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused intel_eth_pci_resume(struct device *dev)
+static int __maybe_unused tc956x_eth_pci_resume(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	int ret;
@@ -1177,64 +978,31 @@ static int __maybe_unused intel_eth_pci_resume(struct device *dev)
 	return stmmac_resume(dev);
 }
 
-static SIMPLE_DEV_PM_OPS(intel_eth_pm_ops, intel_eth_pci_suspend,
-			 intel_eth_pci_resume);
+static SIMPLE_DEV_PM_OPS(tc956x_eth_pm_ops, tc956x_eth_pci_suspend,
+			 tc956x_eth_pci_resume);
 
-#define PCI_DEVICE_ID_INTEL_QUARK		0x0937
-#define PCI_DEVICE_ID_INTEL_EHL_RGMII1G		0x4b30
-#define PCI_DEVICE_ID_INTEL_EHL_SGMII1G		0x4b31
-#define PCI_DEVICE_ID_INTEL_EHL_SGMII2G5	0x4b32
-/* Intel(R) Programmable Services Engine (Intel(R) PSE) consist of 2 MAC
- * which are named PSE0 and PSE1
- */
-#define PCI_DEVICE_ID_INTEL_EHL_PSE0_RGMII1G	0x4ba0
-#define PCI_DEVICE_ID_INTEL_EHL_PSE0_SGMII1G	0x4ba1
-#define PCI_DEVICE_ID_INTEL_EHL_PSE0_SGMII2G5	0x4ba2
-#define PCI_DEVICE_ID_INTEL_EHL_PSE1_RGMII1G	0x4bb0
-#define PCI_DEVICE_ID_INTEL_EHL_PSE1_SGMII1G	0x4bb1
-#define PCI_DEVICE_ID_INTEL_EHL_PSE1_SGMII2G5	0x4bb2
-#define PCI_DEVICE_ID_INTEL_TGLH_SGMII1G_0	0x43ac
-#define PCI_DEVICE_ID_INTEL_TGLH_SGMII1G_1	0x43a2
-#define PCI_DEVICE_ID_INTEL_TGL_SGMII1G		0xa0ac
-#define PCI_DEVICE_ID_INTEL_ADLS_SGMII1G_0	0x7aac
-#define PCI_DEVICE_ID_INTEL_ADLS_SGMII1G_1	0x7aad
-#define PCI_DEVICE_ID_INTEL_ADLN_SGMII1G	0x54ac
-#define PCI_DEVICE_ID_INTEL_RPLP_SGMII1G	0x51ac
+#define PCI_DEVICE_ID_TC956X_XMAC		0x0700 /* FIXME: Synthetic ID, no official vendor */
 
-static const struct pci_device_id intel_eth_pci_id_table[] = {
-	{ PCI_DEVICE_DATA(INTEL, QUARK, &quark_info) },
-	{ PCI_DEVICE_DATA(INTEL, EHL_RGMII1G, &ehl_rgmii1g_info) },
-	{ PCI_DEVICE_DATA(INTEL, EHL_SGMII1G, &ehl_sgmii1g_info) },
-	{ PCI_DEVICE_DATA(INTEL, EHL_SGMII2G5, &ehl_sgmii1g_info) },
-	{ PCI_DEVICE_DATA(INTEL, EHL_PSE0_RGMII1G, &ehl_pse0_rgmii1g_info) },
-	{ PCI_DEVICE_DATA(INTEL, EHL_PSE0_SGMII1G, &ehl_pse0_sgmii1g_info) },
-	{ PCI_DEVICE_DATA(INTEL, EHL_PSE0_SGMII2G5, &ehl_pse0_sgmii1g_info) },
-	{ PCI_DEVICE_DATA(INTEL, EHL_PSE1_RGMII1G, &ehl_pse1_rgmii1g_info) },
-	{ PCI_DEVICE_DATA(INTEL, EHL_PSE1_SGMII1G, &ehl_pse1_sgmii1g_info) },
-	{ PCI_DEVICE_DATA(INTEL, EHL_PSE1_SGMII2G5, &ehl_pse1_sgmii1g_info) },
-	{ PCI_DEVICE_DATA(INTEL, TGL_SGMII1G, &tgl_sgmii1g_phy0_info) },
-	{ PCI_DEVICE_DATA(INTEL, TGLH_SGMII1G_0, &tgl_sgmii1g_phy0_info) },
-	{ PCI_DEVICE_DATA(INTEL, TGLH_SGMII1G_1, &tgl_sgmii1g_phy1_info) },
-	{ PCI_DEVICE_DATA(INTEL, ADLS_SGMII1G_0, &adls_sgmii1g_phy0_info) },
-	{ PCI_DEVICE_DATA(INTEL, ADLS_SGMII1G_1, &adls_sgmii1g_phy1_info) },
-	{ PCI_DEVICE_DATA(INTEL, ADLN_SGMII1G, &tgl_sgmii1g_phy0_info) },
-	{ PCI_DEVICE_DATA(INTEL, RPLP_SGMII1G, &tgl_sgmii1g_phy0_info) },
+#define PCI_DEVICE_ID_TC956X_DEFAULT	0x0220
+
+static const struct pci_device_id tc956x_eth_pci_id_table[] = {
+	{ PCI_DEVICE_DATA(TC956X, DEFAULT, &tc956x_xgmac3_pci_info) },
 	{}
 };
-MODULE_DEVICE_TABLE(pci, intel_eth_pci_id_table);
+MODULE_DEVICE_TABLE(pci, tc956x_eth_pci_id_table);
 
-static struct pci_driver intel_eth_pci_driver = {
-	.name = "intel-eth-pci",
-	.id_table = intel_eth_pci_id_table,
-	.probe = intel_eth_pci_probe,
-	.remove = intel_eth_pci_remove,
+static struct pci_driver tc956x_eth_pci_driver = {
+	.name = "tc956x-eth-pci",
+	.id_table = tc956x_eth_pci_id_table,
+	.probe = tc956x_eth_pci_probe,
+	.remove = tc956x_eth_pci_remove,
 	.driver         = {
-		.pm     = &intel_eth_pm_ops,
+		.pm     = &tc956x_eth_pm_ops,
 	},
 };
 
-module_pci_driver(intel_eth_pci_driver);
+module_pci_driver(tc956x_eth_pci_driver);
 
-MODULE_DESCRIPTION("INTEL 10/100/1000 Ethernet PCI driver");
-MODULE_AUTHOR("Voon Weifeng <weifeng.voon@intel.com>");
+MODULE_DESCRIPTION("Toshiba TC956X 10/100/1000/2500 Ethernet PCI driver");
+MODULE_AUTHOR("Amit Kucheria <amitk@kernel.org>");
 MODULE_LICENSE("GPL v2");
