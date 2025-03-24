@@ -10,9 +10,8 @@
 #include "stmmac.h"
 #include "stmmac_ptp.h"
 
-struct toshiba_priv_data {
+struct tc956x_priv_data {
 	int mdio_adhoc_addr;	/* mdio address for serdes & etc */
-	unsigned long crossts_adj;
 	bool is_pse;
 };
 
@@ -304,115 +303,13 @@ static int tc956x_crosststamp(ktime_t *device,
 			     struct system_counterval_t *system,
 			     void *ctx)
 {
-	struct tc956x_priv_data *tc956x_priv;
-
-	struct stmmac_priv *priv = (struct stmmac_priv *)ctx;
-	void __iomem *ptpaddr = priv->ptpaddr;
-	void __iomem *ioaddr = priv->hw->pcsr;
-	unsigned long flags;
-	u64 art_time = 0;
-	u64 ptp_time = 0;
-	u32 num_snapshot;
-	u32 gpio_value;
-	u32 acr_value;
-	int i;
-
-	if (!boot_cpu_has(X86_FEATURE_ART))
-		return -EOPNOTSUPP;
-
-	tc956x_priv = priv->plat->bsp_priv;
-
-	/* Both internal crosstimestamping and external triggered event
-	 * timestamping cannot be run concurrently.
-	 */
-	if (priv->plat->flags & STMMAC_FLAG_EXT_SNAPSHOT_EN)
-		return -EBUSY;
-
-	priv->plat->flags |= STMMAC_FLAG_INT_SNAPSHOT_EN;
-
-	mutex_lock(&priv->aux_ts_lock);
-	/* Enable Internal snapshot trigger */
-	acr_value = readl(ptpaddr + PTP_ACR);
-	acr_value &= ~PTP_ACR_MASK;
-	switch (priv->plat->int_snapshot_num) {
-	case AUX_SNAPSHOT0:
-		acr_value |= PTP_ACR_ATSEN0;
-		break;
-	case AUX_SNAPSHOT1:
-		acr_value |= PTP_ACR_ATSEN1;
-		break;
-	case AUX_SNAPSHOT2:
-		acr_value |= PTP_ACR_ATSEN2;
-		break;
-	case AUX_SNAPSHOT3:
-		acr_value |= PTP_ACR_ATSEN3;
-		break;
-	default:
-		mutex_unlock(&priv->aux_ts_lock);
-		priv->plat->flags &= ~STMMAC_FLAG_INT_SNAPSHOT_EN;
-		return -EINVAL;
-	}
-	writel(acr_value, ptpaddr + PTP_ACR);
-
-	/* Clear FIFO */
-	acr_value = readl(ptpaddr + PTP_ACR);
-	acr_value |= PTP_ACR_ATSFC;
-	writel(acr_value, ptpaddr + PTP_ACR);
-	/* Release the mutex */
-	mutex_unlock(&priv->aux_ts_lock);
-
-	/* Trigger Internal snapshot signal
-	 * Create a rising edge by just toggle the GPO1 to low
-	 * and back to high.
-	 */
-	gpio_value = readl(ioaddr + GMAC_GPIO_STATUS);
-	gpio_value &= ~GMAC_GPO1;
-	writel(gpio_value, ioaddr + GMAC_GPIO_STATUS);
-	gpio_value |= GMAC_GPO1;
-	writel(gpio_value, ioaddr + GMAC_GPIO_STATUS);
-
-	/* Time sync done Indication - Interrupt method */
-	if (!wait_event_interruptible_timeout(priv->tstamp_busy_wait,
-					      stmmac_cross_ts_isr(priv),
-					      HZ / 100)) {
-		priv->plat->flags &= ~STMMAC_FLAG_INT_SNAPSHOT_EN;
-		return -ETIMEDOUT;
-	}
-
-	num_snapshot = (readl(ioaddr + GMAC_TIMESTAMP_STATUS) &
-			GMAC_TIMESTAMP_ATSNS_MASK) >>
-			GMAC_TIMESTAMP_ATSNS_SHIFT;
-
-	/* Repeat until the timestamps are from the FIFO last segment */
-	for (i = 0; i < num_snapshot; i++) {
-		read_lock_irqsave(&priv->ptp_lock, flags);
-		stmmac_get_ptptime(priv, ptpaddr, &ptp_time);
-		*device = ns_to_ktime(ptp_time);
-		read_unlock_irqrestore(&priv->ptp_lock, flags);
-		get_arttime(priv->mii, tc956x_priv->mdio_adhoc_addr, &art_time);
-		system->cycles = art_time;
-	}
-
-	system->cycles *= tc956x_priv->crossts_adj;
-	system->cs_id = CSID_X86_ART;
-	priv->plat->flags &= ~STMMAC_FLAG_INT_SNAPSHOT_EN;
-
 	return 0;
 }
 
 static void tc956x_mgbe_pse_crossts_adj(struct tc956x_priv_data *tc956x_priv,
-				       int base)
+					int base)
 {
-	if (boot_cpu_has(X86_FEATURE_ART)) {
-		unsigned int art_freq;
 
-		/* On systems that support ART, ART frequency can be obtained
-		 * from ECX register of CPUID leaf (0x15).
-		 */
-		art_freq = cpuid_ecx(ART_CPUID_LEAF);
-		do_div(art_freq, base);
-		tc956x_priv->crossts_adj = art_freq;
-	}
 }
 
 static void common_default_data(struct plat_stmmacenet_data *plat)
@@ -874,7 +771,6 @@ static int tc956x_eth_pci_probe(struct pci_dev *pdev,
 
 	plat->bsp_priv = tc956x_priv;
 	tc956x_priv->mdio_adhoc_addr = TC956X_MGBE_ADHOC_ADDR;
-	tc956x_priv->crossts_adj = 1;
 
 	/* Initialize all MSI vectors to invalid so that it can be set
 	 * according to platform data settings below.
@@ -981,12 +877,13 @@ static int __maybe_unused tc956x_eth_pci_resume(struct device *dev)
 static SIMPLE_DEV_PM_OPS(tc956x_eth_pm_ops, tc956x_eth_pci_suspend,
 			 tc956x_eth_pci_resume);
 
-#define PCI_DEVICE_ID_TC956X_XMAC		0x0700 /* FIXME: Synthetic ID, no official vendor */
+#define PCI_DEVICE_ID_TOSHIBA_XMAC		0x0700 /* FIXME: Synthetic ID, no official vendor */
 
-#define PCI_DEVICE_ID_TC956X_DEFAULT	0x0220
+#define PCI_DEVICE_ID_TOSHIBA_DEFAULT	0x0220
 
+/* FIXME: Downstream seems to use a dummy PCI ID */
 static const struct pci_device_id tc956x_eth_pci_id_table[] = {
-	{ PCI_DEVICE_DATA(TC956X, DEFAULT, &tc956x_xgmac3_pci_info) },
+	{ PCI_DEVICE_DATA(TOSHIBA, XMAC, &tc956x_xgmac3_pci_info) },
 	{}
 };
 MODULE_DEVICE_TABLE(pci, tc956x_eth_pci_id_table);

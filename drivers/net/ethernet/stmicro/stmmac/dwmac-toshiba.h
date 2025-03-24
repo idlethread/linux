@@ -33,8 +33,8 @@
 #define SERDES_RATE_PCIE_SHIFT	8
 #define SERDES_PCLK_SHIFT	12
 
-#define TOSHIBA_MGBE_ADHOC_ADDR	0x15
-#define TOSHIBA_MGBE_XPCS_ADDR	0x16
+#define TC956X_MGBE_ADHOC_ADDR	0x15
+#define TC956X_MGBE_XPCS_ADDR	0x10
 
 /* Cross-timestamping defines */
 #define ART_CPUID_LEAF		0x15
