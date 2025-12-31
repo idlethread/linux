@@ -71,6 +71,82 @@ char *qfprom_read(struct device *dev, const char *cname)
 	return ret;
 }
 
+/* Read binning information from the FUSE. The infomation storage is SoC-dependent */
+int tsens_read_bin_info()
+{
+	u32 jtag_id, feat_id;
+	u32 i_temp;
+
+	if (of_machine_is_compatible("qcom,qcm6490")) {
+		ret = nvmem_cell_read_variable_le_u32(priv->dev, "jtag_id", &jtag_id);
+		if (ret < 0)
+			return ret;
+		ret = nvmem_cell_read_variable_le_u32(priv->dev, "feat_id", &feat_id);
+		if (ret < 0)
+			return ret;
+
+		if (jtag_id && feat_id) {
+			/* 105 */
+		} else {
+			/* 95  */
+		}
+
+	}
+
+	if (of_machine_is_compatible("qcom,x1e80100") ||
+	    of_machine_is_compatible("qcom,x1p42100")) {
+		ret = nvmem_cell_read_variable_le_u32(priv->dev, "i_temp", &i_temp);
+		if (ret < 0)
+			return ret;
+
+		if (i_temp) {
+			/* 105 */
+		} else {
+			/* 95  */
+		}
+	}
+}
+
+
+static int tsens_populate_bininfo(struct tsens_priv *priv)
+{
+	u32 hw_values[4] = {0};  /* Max N=4 from bindings; adjust per-SoC */
+	u32 jtagid = 0, featid = 0, itemp = 0;
+	int ret;
+
+	/* Read raw FUSE fields via nvmem (as in existing tsens_read_bininfo) */
+	if (of_machine_is_compatible("qcom,qcm6490")) {
+		ret = nvmem_cell_read_variable_le_u32(priv->dev, "jtag-id", &jtagid);
+		if (ret < 0) return ret;
+		ret = nvmem_cell_read_variable_le_u32(priv->dev, "feat-id", &featid);
+		if (ret < 0) return ret;
+		hw_values[0] = (jtagid << 0) | (featid << 16);  /* Pack into words; bits per DTS */
+	} else if (of_machine_is_compatible("qcom,x1e80100") ||
+		of_machine_is_compatible("qcom,x1p42100")) {
+		ret = nvmem_cell_read_variable_le_u32(priv->dev, "i-temp", &itemp);
+		if (ret < 0) return ret;
+		hw_values[0] = (itemp & 0x1) ? 0x2 : 0x1;  /* Bit 0/31 -> bin mask */
+	} else if (of_machine_is_compatible("qcom,hamoa")) {
+		ret = nvmem_cell_read_variable_le_u32(priv->dev, "gpu-speed-bin", &hw_values[0]);
+		if (ret < 0) return ret;
+		hw_values[0] >>= 7;  /* Bits 7:8 -> low bits */
+		hw_values[0] &= 0x3;
+	} else if (of_machine_is_compatible("qcom,kodiak")) {
+		ret = nvmem_cell_read_variable_le_u32(priv->dev, "gpu-speed-bin", &hw_values[0]);
+		if (ret < 0) return ret;
+		hw_values[0] >>= 5;  /* Bits 5:8 */
+		hw_values[0] &= 0xF;
+		/* Optional: Add jtagid bits 0:19, featid 20:27 from reg 0x180 */
+	}
+	/* Default/others: hw_values[0] = 0x1; */
+
+	priv->bininfo.supported_hw = hw_values;
+	priv->bininfo.supported_hwcount = 1;  /* Or count non-zero */
+
+	return dev_thermal_set_supported_hw(&priv->dev, hw_values, 1);
+}
+
+
 int tsens_read_calibration(struct tsens_priv *priv, int shift, u32 *p1, u32 *p2, bool backup)
 {
 	u32 mode;
@@ -1340,6 +1416,10 @@ static int tsens_probe(struct platform_device *pdev)
 	}
 	priv->feat = data->feat;
 	priv->fields = data->fields;
+
+	ret = tsens_populate_bininfo(priv);
+	if (ret)
+		dev_warn(&pdev->dev, "Failed to populate bininfo: %d\n", ret);
 
 	platform_set_drvdata(pdev, priv);
 

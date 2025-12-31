@@ -1015,6 +1015,14 @@
 				reg = <0x1e9 0x2>;
 				bits = <5 8>;
 			};
+			jtag_id: jtag-id@180 {
+				reg = <0x180 0x4>;
+				bits = <0 19>;
+			};
+			feat_id: feat-id@180 {
+				reg = <0x180 0x4>;
+				bits = <20 27>;
+			};
 		};
 
 		sdhc_1: mmc@7c4000 {

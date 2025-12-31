@@ -31,6 +31,72 @@ static const char * const trip_types[] = {
 	[THERMAL_TRIP_CRITICAL]	= "critical",
 };
 
+static bool thermal_of_trip_is_supported(struct device_node *np,
+					 const struct thermal_bin_info *hw)
+{
+	int count, i, j;
+	unsigned int levels;
+	u32 val;
+
+	if (!hw || !hw->supported_hw || !hw->supported_hw_count)
+		return true;
+
+	levels = hw->supported_hw_count;
+
+	count = of_property_count_u32_elems(np, "thermal-bin-hw");
+	if (count < 0)
+		return true;
+
+	if (count == 0)
+		return true;
+
+	if (count % levels) {
+		pr_warn("%pOF: invalid thermal-bin-hw length %d (levels %u)\n",
+			np, count, levels);
+		return false;
+	}
+
+	for (i = 0; i < count / levels; i++) {
+		bool match = true;
+
+		for (j = 0; j < levels; j++) {
+			if (of_property_read_u32_index(np, "thermal-bin-hw",
+						       i * levels + j, &val)) {
+				match = false;
+				break;
+			}
+
+			if (!(val & hw->supported_hw[j])) {
+				match = false;
+				break;
+			}
+		}
+
+		if (match)
+			return true;
+	}
+
+	return false;
+}
+
+const struct thermal_bin_info *thermal_of_get_bin_info(struct thermal_zone_device *tzd)
+{
+	/*
+	 * This is a placeholder hook to obtain platform-provided
+	 * hardware information for a given thermal zone.
+	 *
+	 * The implementation is intentionally left minimal here,
+	 * as the wiring depends on the SoC integration. For example:
+	 *
+	 * - Embed struct thermal_bin_info into tzd->devdata and retrieve it.
+	 * - Or maintain a global/static instance for the SoC.
+	 *
+	 * For now, return NULL to keep behaviour unchanged on platforms
+	 * that do not provide hardware information.
+	 */
+	return NULL;
+}
+
 /**
  * thermal_of_get_trip_type - Get phy mode for given device_node
  * @np:	Pointer to the given device_node
@@ -65,6 +131,7 @@ static int thermal_of_populate_trip(struct device_node *np,
 {
 	int prop;
 	int ret;
+	const struct thermal_bin_info *hw;
 
 	ret = of_property_read_u32(np, "temperature", &prop);
 	if (ret < 0) {
@@ -90,6 +157,12 @@ static int thermal_of_populate_trip(struct device_node *np,
 
 	trip->priv = np;
 
+	hw = thermal_of_get_bin_info(tz);
+	if (!thermal_of_trip_is_supported(np, hw)) {
+		pr_debug("%pOF: trip %d disabled by thermal-bin-hw\n", np, index);
+		return -ENODEV;
+	}
+
 	return 0;
 }
 
@@ -98,7 +171,7 @@ static struct thermal_trip *thermal_of_trips_init(struct device_node *np, int *n
 	int ret, count;
 
 	*ntrips = 0;
-	
+
 	struct device_node *trips __free(device_node) = of_get_child_by_name(np, "trips");
 	if (!trips)
 		return NULL;

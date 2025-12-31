@@ -39,6 +39,13 @@ enum tsens_ver {
 	VER_2_X_NO_RPM,
 };
 
+/* Possible values of highest trip point in degree Celsius as read from SoC FUSE */
+enum tsens_temp_bin {
+	TSENS_BIN_95 = 95,
+	TSENS_BIN_105 = 105,
+	TSENS_BIN_115 = 115,
+};
+
 enum tsens_irq_type {
 	LOWER,
 	UPPER,
@@ -558,6 +565,7 @@ struct tsens_context {
  * @srot_map: pointer to SROT register address space
  * @tm_offset: deal with old device trees that don't address TM and SROT
  *             address space separately
+ * @bin_info: Binning information read from SoC EFUSE
  * @ul_lock: lock while processing upper/lower threshold interrupts
  * @crit_lock: lock while processing critical threshold interrupts
  * @rf: array of regmap_fields used to store value of the field
@@ -575,6 +583,7 @@ struct tsens_priv {
 	struct regmap			*tm_map;
 	struct regmap			*srot_map;
 	u32				tm_offset;
+	struct thermal_bin_info		*bin_info;
 
 	/* lock for upper/lower threshold interrupts */
 	spinlock_t			ul_lock;

@@ -86,6 +86,19 @@ struct thermal_trip {
 #define THERMAL_TRIP_PRIV_TO_INT(_val_)	(uintptr_t)(_val_)
 #define THERMAL_INT_TO_TRIP_PRIV(_val_)	(void *)(uintptr_t)(_val_)
 
+/**
+ * struct thermal_bin_info - platform-specific binning description
+ * @supported_hw: array of bitfields identifying the running hardware
+ * @supported_hw_count: number of valid entries in @supported_hw
+ *
+ * This structure is intended to be filled by platform code that decodes
+ * SoC revision / fuse information and shared with the thermal OF parser.
+ */
+struct thermal_bin_info {
+	const u32 *supported_hw;
+	unsigned int supported_hw_count;
+};
+
 struct cooling_spec {
 	unsigned long upper;	/* Highest cooling state  */
 	unsigned long lower;	/* Lowest cooling state  */
@@ -198,6 +211,23 @@ struct thermal_zone_device *devm_thermal_of_zone_register(struct device *dev, in
 
 void devm_thermal_of_zone_unregister(struct device *dev, struct thermal_zone_device *tz);
 
+struct thermal_bin_info *thermal_of_get_bin_info(struct thermal_zone_device *tzd);
+
+/* thermal-bin helpers */
+static inline int dev_thermal_set_supported_hw(struct device *dev, const u32 *versions, unsigned int count)
+{
+	struct thermal_bin_info config = {
+		.supported_hw = versions,
+		.supported_hw_count = count,
+	};
+
+	return dev_thermal_set_config(dev, &config);
+}
+
+static inline void dev_pm_opp_put_supported_hw(int token)
+{
+	dev_thermal_clear_supported_hw(token);
+}
 #else
 
 static inline
@@ -211,6 +241,17 @@ static inline void devm_thermal_of_zone_unregister(struct device *dev,
 						   struct thermal_zone_device *tz)
 {
 }
+
+static inline struct thermal_bin_info *thermal_of_get_bin_info(struct thermal_zone_device *tzd)
+{
+	return ERR_PTR(-ENOTSUPP);
+}
+
+static inline int dev_thermal_set_supported_hw(struct device *dev, const u32 *versions, unsigned int count)
+{
+	return ERR_PTR(-ENOTSUPP);
+}
+
 #endif
 
 int for_each_thermal_trip(struct thermal_zone_device *tz,
