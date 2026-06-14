@@ -171,6 +171,11 @@
 		reg = <0x119 0x2>;
 		bits = <7 9>;
 	};
+	i_temp: i-temp@180 {
+		reg = <0x180 0x4>;
+		/* bits = <offset width>: 1 bit at offset 31 */
+		bits = <31 1>;
+	};
 };
 
 &soc {
