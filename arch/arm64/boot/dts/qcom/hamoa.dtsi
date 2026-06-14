@@ -8680,6 +8680,11 @@
 				reg = <0x119 0x2>;
 				bits = <7 8>;
 			};
+			i_temp: i-temp@180 {
+				reg = <0x180 0x4>;
+				/* bits = <offset width>: 1 bit at offset 14 */
+				bits = <14 1>;
+			};
 		};
 
 		pmu@24091000 {
@@ -8997,7 +9002,9 @@
 				};
 
 				aoss0-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9009,7 +9016,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9021,7 +9030,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9033,7 +9044,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9045,7 +9058,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9057,7 +9072,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9069,7 +9086,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9081,7 +9100,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9093,7 +9114,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9105,7 +9128,9 @@
 
 			trips {
 				cpuss2-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9117,7 +9142,9 @@
 
 			trips {
 				cpuss2-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9135,7 +9162,9 @@
 				};
 
 				mem-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <0>;
 					type = "critical";
 				};
@@ -9153,7 +9182,9 @@
 				};
 
 				video-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9171,7 +9202,9 @@
 				};
 
 				aoss0-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9183,7 +9216,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9195,7 +9230,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9207,7 +9244,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9219,7 +9258,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9231,7 +9272,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9243,7 +9286,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9255,7 +9300,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9267,7 +9314,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9279,7 +9328,9 @@
 
 			trips {
 				cpuss2-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9291,7 +9342,9 @@
 
 			trips {
 				cpuss2-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9309,7 +9362,9 @@
 				};
 
 				aoss0-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9321,7 +9376,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9333,7 +9390,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9345,7 +9404,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9357,7 +9418,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9369,7 +9432,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9381,7 +9446,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9393,7 +9460,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9405,7 +9474,9 @@
 
 			trips {
 				cpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9417,7 +9488,9 @@
 
 			trips {
 				cpuss2-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9429,7 +9502,9 @@
 
 			trips {
 				cpuss2-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9447,7 +9522,9 @@
 				};
 
 				aoss0-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9465,7 +9542,9 @@
 				};
 
 				nsp0-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9483,7 +9562,9 @@
 				};
 
 				nsp1-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9501,7 +9582,9 @@
 				};
 
 				nsp2-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9519,7 +9602,9 @@
 				};
 
 				nsp3-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9546,7 +9631,9 @@
 				};
 
 				gpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9573,7 +9660,9 @@
 				};
 
 				gpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9600,7 +9689,9 @@
 				};
 
 				gpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9627,7 +9718,9 @@
 				};
 
 				gpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9654,7 +9747,9 @@
 				};
 
 				gpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9681,7 +9776,9 @@
 				};
 
 				gpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9708,7 +9805,9 @@
 				};
 
 				gpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9735,7 +9834,9 @@
 				};
 
 				gpu-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9753,7 +9854,9 @@
 				};
 
 				camera0-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
@@ -9771,7 +9874,9 @@
 				};
 
 				camera0-critical {
-					temperature = <115000>;
+					/* 95C for bin 0x1 (standard), 105C for bin 0x2 (high-temp) */
+					temperature-bin = <95000 105000>;
+					thermal-hw-bin = <0x1>, <0x2>;
 					hysteresis = <1000>;
 					type = "critical";
 				};
